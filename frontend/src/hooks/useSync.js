@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { apiService } from '../services/api';
 
+
 /**
  * Custom React Hook to monitor database health and synchrony metrics
  */

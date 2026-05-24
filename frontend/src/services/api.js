@@ -3,7 +3,10 @@
  * Automatically communicates with standard Express /api endpoint schema.
  */
 
-const API_BASE = '/api';
+import API_URL from '../config/api';
+
+const API_BASE = API_URL ? `${API_URL}/api` : '/api';
+
 
 /**
  * Helper to execute standard JSON requests
