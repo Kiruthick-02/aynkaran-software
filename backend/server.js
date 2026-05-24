@@ -6,33 +6,86 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import { setupDatabase } from './config/db.js';
-import { createExpressApp } from './app.js';
 import path from 'path';
 import express from 'express';
+import { fileURLToPath } from 'url';
 
-const PORT = process.env.PORT || 5000;
+import { setupDatabase } from './config/db.js';
+import { createExpressApp } from './app.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Railway automatically provides PORT
+const PORT = process.env.PORT || 8080;
 
 async function run() {
-  console.log('[System] Initializing Aynkaran production MongoDB connection...');
-  const db = await setupDatabase();
+  try {
+    console.log('[System] Connecting to MongoDB...');
 
-  const app = createExpressApp(db);
+    // Database connection
+    const db = await setupDatabase();
 
-  // Serve static UI assets under production builds
-  if (process.env.NODE_ENV === 'production') {
-    const buildPath = path.join(process.cwd(), '../frontend/dist');
-    app.use(express.static(buildPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(buildPath, 'index.html'));
+    console.log('[System] MongoDB connected successfully');
+
+    // Create Express app
+    const app = createExpressApp(db);
+
+    // Trust Railway proxy
+    app.set('trust proxy', 1);
+
+    // Health check route
+    app.get('/health', (req, res) => {
+      res.status(200).json({
+        success: true,
+        message: 'Aynkaran Backend Running',
+        environment: process.env.NODE_ENV || 'development',
+      });
     });
-  }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Aynkaran Backend Server] Running successfully on port http://localhost:${PORT}`);
-  });
+    /**
+     * ===============================
+     * PRODUCTION FRONTEND SERVING
+     * ===============================
+     */
+    if (process.env.NODE_ENV === 'production') {
+      // React/Vite build folder
+      const frontendPath = path.join(__dirname, '../frontend/dist');
+
+      console.log('[System] Serving frontend from:', frontendPath);
+
+      // Serve static files
+      app.use(express.static(frontendPath));
+
+      // React Router support
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(frontendPath, 'index.html'));
+      });
+    }
+
+    /**
+     * ===============================
+     * START SERVER
+     * ===============================
+     */
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`
+========================================
+    Aynkaran Server Started Successfully
+    Environment : ${process.env.NODE_ENV || 'development'}
+    Port        : ${PORT}
+========================================
+      `);
+    });
+  } catch (error) {
+    console.error(`
+========================================
+ SERVER STARTUP FAILED
+========================================
+`, error);
+
+    process.exit(1);
+  }
 }
 
-run().catch((err) => {
-  console.error('[Boot Failure] Failed to start production server:', err);
-});
+run();
