@@ -5,6 +5,7 @@
 
 import express from 'express';
 import cors from 'cors';
+import { syncRoutes } from './routes/syncRoutes.js';
 
 import { customerRoutes } from './routes/customerRoutes.js';
 import { recruitmentRoutes } from './routes/recruitmentRoutes.js';
@@ -102,6 +103,8 @@ export function createExpressApp(db) {
   app.use('/api/policies', policyRoutes(db));
 
   app.use('/api/reminders', reminderRoutes(db));
+
+  app.use('/api/sync', syncRoutes(db));
 
   /**
    * ==========================================
