@@ -1,0 +1,6 @@
+{
+  "name": "Aynkaran Consultants",
+  "description": "Insurance Operations Management System (ERP) for agent recruitment, policy sales, CRM, document vault, and reminders.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,38 @@
+{
+  "appId": "com.aynkaran.desk.crm",
+  "productName": "Aynkaran Consultants Desk Management",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "electron/**/*",
+    "backend/**/*",
+    "database.json",
+    "package.json"
+  ],
+  "asar": true,
+  "win": {
+    "target": "nsis",
+    "icon": "frontend/public/icon.png"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": "always",
+    "createStartMenuShortcut": true,
+    "shortcutName": "Aynkaran Desk CRM"
+  },
+  "mac": {
+    "category": "public.app-category.business",
+    "target": [
+      "dmg"
+    ]
+  },
+  "linux": {
+    "target": [
+      "AppImage",
+      "deb"
+    ],
+    "category": "Office"
+  }
+}
