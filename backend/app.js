@@ -5,6 +5,7 @@
 
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import { syncRoutes } from './routes/syncRoutes.js';
 
 import { customerRoutes } from './routes/customerRoutes.js';
@@ -66,11 +67,15 @@ export function createExpressApp(db) {
    * EXPRESS MIDDLEWARE
    * ==========================================
    */
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' }));
 
   app.use(express.urlencoded({
+    limit: '50mb',
     extended: true,
   }));
+
+  // Serve document uploads statically
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   /**
    * ==========================================

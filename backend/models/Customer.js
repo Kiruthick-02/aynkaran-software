@@ -3,24 +3,51 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// MongoDB Atlas High-Speed CRM client profile document model definition
 export class Customer {
-  static createTableQuery() {
-    return `
-      CREATE TABLE IF NOT EXISTS customers (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        fatherName TEXT,
-        motherName TEXT,
-        dob TEXT,
-        mobileNumber TEXT UNIQUE,
-        emailId TEXT,
-        address TEXT,
-        spouseName TEXT,
-        kycDocuments TEXT, -- JSON Object
-        nominee TEXT,      -- JSON Object
-        work TEXT,         -- JSON Object
-        createdAt TEXT
-      );
-    `;
+  static getCollectionName() {
+    return 'customers';
+  }
+
+  static getSchema() {
+    return {
+      id: { type: String, required: true, unique: true },
+      name: { type: String, required: true },
+      fatherName: { type: String },
+      motherName: { type: String },
+      dob: { type: String },
+      mobileNumber: { type: String, required: true, unique: true },
+      emailId: { type: String },
+      address: { type: String },
+      spouseName: { type: String },
+      kycDocuments: {
+        type: Object,
+        default: {
+          passportSizePhoto: undefined,
+          aadhaarCard: undefined,
+          panCard: undefined,
+          incomeProof: undefined,
+          educationCertificate: undefined,
+          passport: undefined,
+          signatureCopy: undefined
+        }
+      },
+      nominee: {
+        type: Object,
+        default: {
+          name: String,
+          dob: String,
+          relationship: String
+        }
+      },
+      work: {
+        type: Object,
+        default: {
+          annualIncome: Number,
+          occupation: String
+        }
+      },
+      createdAt: { type: String, required: true }
+    };
   }
 }

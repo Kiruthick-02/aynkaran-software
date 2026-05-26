@@ -3,17 +3,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// MongoDB Atlas High-Speed CRM upload tracker document model definition
 export class Document {
-  // SQLite handles document tracking in relational mapping columns as JSON Arrays inside our candidate/customer contexts.
-  static getMetaSpecification() {
+  static getCollectionName() {
+    return 'documents';
+  }
+
+  static getSchema() {
     return {
-      columns: {
-        id: 'TEXT PRIMARY KEY',
-        name: 'TEXT NOT NULL',
-        category: 'TEXT',
-        url: 'TEXT NOT NULL',
-        uploadedAt: 'TEXT'
-      }
+      id: { type: String, required: true, unique: true },
+      name: { type: String, required: true },
+      category: { type: String },
+      url: { type: String, required: true },
+      uploadedAt: { type: String, required: true }
     };
   }
 }

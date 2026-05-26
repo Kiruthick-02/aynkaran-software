@@ -3,14 +3,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// MongoDB Atlas High-Speed CRM IRDAI certification exam document model definition
 export class Exam {
-  // SQLite handles IRDAI licensing exam tracker as serialized items in trainee profiles.
-  static getMetaSpecification() {
+  static getCollectionName() {
+    return 'exams';
+  }
+
+  static getSchema() {
     return {
-      scheduledDate: 'TEXT',
-      score: 'INTEGER',
-      result: 'TEXT', // Pass, Fail, Awaiting
-      agentCodeGenerated: 'TEXT'
+      scheduledDate: { type: String },
+      score: { type: Number },
+      result: { type: String }, // Pass, Fail, Awaiting
+      agentCodeGenerated: { type: String }
     };
   }
 }

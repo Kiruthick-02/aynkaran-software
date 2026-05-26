@@ -87,10 +87,34 @@ export const apiService = {
     method: 'PUT',
     body: JSON.stringify(reminder)
   }),
+  deleteReminder: (id) => request(`/reminders/${encodeURIComponent(id)}`, {
+    method: 'DELETE'
+  }),
 
   // --- BATCH HARMONIZED REALTIME SYNC ---
   syncDatabase: (data) => request('/sync', {
     method: 'POST',
     body: JSON.stringify(data)
-  })
+  }),
+
+  // --- MULTIPART SECURE BINARY DOCUMENT UPLOADER ---
+  uploadDocument: async (file, category, targetId, targetType) => {
+    const formData = new FormData();
+    formData.append('category', category);
+    formData.append('targetId', targetId);
+    formData.append('targetType', targetType);
+    formData.append('file', file);
+
+    const response = await fetch(`${API_BASE}/documents/upload`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => 'Upload Error');
+      throw new Error(`Upload Error [${response.status}]: ${errText}`);
+    }
+
+    return response.json();
+  }
 };
