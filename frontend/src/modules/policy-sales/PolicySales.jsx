@@ -24,7 +24,7 @@ export const POLICY_STAGES = [
   'Renewal Date Assigned',
 ];
 
-export default function PolicySales({ policies = [], setPolicies, customers = [] }) {
+export default function PolicySales({ policies = [], addPolicy, updatePolicy, deletePolicy, customers = [] }) {
   const [selectedLead, setSelectedLead] = useState(null);
   const [isAddingLead, setIsAddingLead] = useState(false);
 
@@ -83,7 +83,7 @@ export default function PolicySales({ policies = [], setPolicies, customers = []
       notes: initialNotes || 'Initial appointment logged.',
     };
 
-    setPolicies((prev) => [newLead, ...prev]);
+    addPolicy(newLead);
     setIsAddingLead(false);
     setSelectedCustomerId('');
     setCustomCustomerName('');
@@ -91,77 +91,69 @@ export default function PolicySales({ policies = [], setPolicies, customers = []
   };
 
   const promoteLeadStage = (leadId, nextStage) => {
-    setPolicies((prev) =>
-      prev.map((lead) => {
-        if (lead.id !== leadId) return lead;
+    const lead = policies.find((l) => l.id === leadId);
+    if (!lead) return;
 
-        let finalStage = nextStage;
-        let resultVal = lead.result;
-        let finalPolicyNo = lead.issuedPolicyNumber;
-        let finalIssueDate = lead.issueDate;
-        let finalRenewalDate = lead.renewalDate;
+    let finalStage = nextStage;
+    let resultVal = lead.result;
+    let finalPolicyNo = lead.issuedPolicyNumber;
+    let finalIssueDate = lead.issueDate;
+    let finalRenewalDate = lead.renewalDate;
 
-        if (nextStage === 'Result (Yes/No)') {
-          resultVal = leadResult;
-        } else if (nextStage === 'Policy Issued') {
-          finalPolicyNo = issuedPolicyNo || `POL-AYN-${Math.floor(100000 + Math.random() * 900000)}`;
-          finalIssueDate = issuedDateStr || new Date().toISOString().split('T')[0];
-        } else if (nextStage === 'Renewal Date Assigned') {
-          if (lead.issueDate) {
-            const d = new Date(lead.issueDate);
-            d.setFullYear(d.getFullYear() + 1);
-            finalRenewalDate = renewalDateStr || d.toISOString().split('T')[0];
-          } else {
-            finalRenewalDate = renewalDateStr || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-          }
-        }
+    if (nextStage === 'Result (Yes/No)') {
+      resultVal = leadResult;
+    } else if (nextStage === 'Policy Issued') {
+      finalPolicyNo = issuedPolicyNo || `POL-AYN-${Math.floor(100000 + Math.random() * 900000)}`;
+      finalIssueDate = issuedDateStr || new Date().toISOString().split('T')[0];
+    } else if (nextStage === 'Renewal Date Assigned') {
+      if (lead.issueDate) {
+        const d = new Date(lead.issueDate);
+        d.setFullYear(d.getFullYear() + 1);
+        finalRenewalDate = renewalDateStr || d.toISOString().split('T')[0];
+      } else {
+        finalRenewalDate = renewalDateStr || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      }
+    }
 
-        const updated = {
-          ...lead,
-          currentStage: finalStage,
-          result: resultVal,
-          issuedPolicyNumber: finalPolicyNo,
-          issueDate: finalIssueDate,
-          renewalDate: finalRenewalDate,
-          pendingStageSince: new Date().toISOString().split('T')[0],
-        };
+    const updated = {
+      ...lead,
+      currentStage: finalStage,
+      result: resultVal,
+      issuedPolicyNumber: finalPolicyNo,
+      issueDate: finalIssueDate,
+      renewalDate: finalRenewalDate,
+      pendingStageSince: new Date().toISOString().split('T')[0],
+    };
 
-        if (selectedLead && selectedLead.id === leadId) {
-          setSelectedLead(updated);
-        }
-
-        return updated;
-      })
-    );
+    updatePolicy(leadId, updated);
+    if (selectedLead && selectedLead.id === leadId) {
+      setSelectedLead(updated);
+    }
   };
 
   const handleAddQuote = (leadId) => {
     if (!quoteDescription || !quoteAmount) return;
 
-    setPolicies((prev) =>
-      prev.map((lead) => {
-        if (lead.id !== leadId) return lead;
+    const lead = policies.find((l) => l.id === leadId);
+    if (!lead) return;
 
-        const newQuote = {
-          id: `q-${Date.now()}`,
-          description: quoteDescription,
-          amount: parseFloat(quoteAmount),
-          date: new Date().toISOString().split('T')[0],
-        };
+    const newQuote = {
+      id: `q-${Date.now()}`,
+      description: quoteDescription,
+      amount: parseFloat(quoteAmount),
+      date: new Date().toISOString().split('T')[0],
+    };
 
-        const updated = {
-          ...lead,
-          quotes: [...(lead.quotes || []), newQuote],
-          premiumAmount: parseFloat(quoteAmount),
-        };
+    const updated = {
+      ...lead,
+      quotes: [...(lead.quotes || []), newQuote],
+      premiumAmount: parseFloat(quoteAmount),
+    };
 
-        if (selectedLead && selectedLead.id === leadId) {
-          setSelectedLead(updated);
-        }
-
-        return updated;
-      })
-    );
+    updatePolicy(leadId, updated);
+    if (selectedLead && selectedLead.id === leadId) {
+      setSelectedLead(updated);
+    }
 
     setQuoteDescription('');
     setQuoteAmount('');
@@ -169,7 +161,7 @@ export default function PolicySales({ policies = [], setPolicies, customers = []
 
   const handleDeleteLead = (id) => {
     if (confirm('Delete this policy sale item?')) {
-      setPolicies((prev) => prev.filter((p) => p.id !== id));
+      deletePolicy(id);
       setSelectedLead(null);
     }
   };

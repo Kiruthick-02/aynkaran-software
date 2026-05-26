@@ -13,7 +13,7 @@ import {
   Trash2,
 } from 'lucide-react';
 
-export default function Reminders({ reminders = [], setReminders }) {
+export default function Reminders({ reminders = [], addReminder, updateReminder, deleteReminder }) {
   const [filterType, setFilterType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [successToast, setSuccessToast] = useState(null);
@@ -30,41 +30,30 @@ export default function Reminders({ reminders = [], setReminders }) {
       setSuccessToast(null);
     }, 4000);
 
-    setReminders((prev) =>
-      prev.map((r) => {
-        if (r.id !== reminder.id) return r;
-        return {
-          ...r,
-          channels: {
-            ...r.channels,
-            [channel]: true,
-          },
-        };
-      })
-    );
+    const updatedChannels = {
+      ...reminder.channels,
+      [channel]: true,
+    };
+    updateReminder(reminder.id, { channels: updatedChannels });
   };
 
   const toggleReminderComplete = (id) => {
-    setReminders((prev) =>
-      prev.map((r) => {
-        if (r.id !== id) return r;
-        return {
-          ...r,
-          completed: !r.completed,
-        };
-      })
-    );
+    const r = reminders.find((item) => item.id === id);
+    if (r) {
+      updateReminder(id, { completed: !r.completed });
+    }
   };
 
   const handleDeleteReminder = (id) => {
     if (confirm('Are you sure you want to permanently delete this reminder?')) {
-      setReminders((prev) => prev.filter((r) => r.id !== id));
+      deleteReminder(id);
     }
   };
 
   const handleClearCompleted = () => {
     if (confirm('Clear all completed notification tasks from historic logs?')) {
-      setReminders((prev) => prev.filter((r) => !r.completed));
+      const completed = reminders.filter((r) => r.completed);
+      completed.forEach((r) => deleteReminder(r.id));
     }
   };
 

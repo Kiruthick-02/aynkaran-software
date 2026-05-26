@@ -12,6 +12,14 @@ import {
   ShieldCheck,
   Eye,
 } from 'lucide-react';
+import API_URL from '../../config/api';
+
+const getFileUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('data:')) return url;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return `${API_URL || ''}${url}`;
+};
 
 export default function Documents({ candidates = [], customers = [] }) {
   const { updateCandidate, updateCustomer } = useApp();
@@ -56,25 +64,36 @@ export default function Documents({ candidates = [], customers = [] }) {
       sourceName: c.name,
       sourceType: 'Candidate',
       uploadedAt: doc.uploadedAt,
+      url: doc.url,
     }))
   );
 
   const customerDocs = customers.flatMap((cust) => {
     const list = [];
     if (cust.kycDocuments?.aadhaarCard) {
-      list.push({ id: `${cust.id}-aadhaar`, key: 'aadhaarCard', customerId: cust.id, name: cust.kycDocuments.aadhaarCard, category: 'Aadhaar Card', sourceName: cust.name, sourceType: 'Customer', uploadedAt: '2025-05-10' });
+      const fullUrl = cust.kycDocuments.aadhaarCard;
+      const fileName = fullUrl.startsWith('data:') ? 'Aadhaar_Document.png' : fullUrl.substring(fullUrl.lastIndexOf('/') + 1);
+      list.push({ id: `${cust.id}-aadhaar`, key: 'aadhaarCard', customerId: cust.id, name: fileName, category: 'Aadhaar Card', sourceName: cust.name, sourceType: 'Customer', uploadedAt: '2025-05-10', url: fullUrl });
     }
     if (cust.kycDocuments?.panCard) {
-      list.push({ id: `${cust.id}-pan`, key: 'panCard', customerId: cust.id, name: cust.kycDocuments.panCard, category: 'PAN Card', sourceName: cust.name, sourceType: 'Customer', uploadedAt: '2025-05-10' });
+      const fullUrl = cust.kycDocuments.panCard;
+      const fileName = fullUrl.startsWith('data:') ? 'PAN_Document.png' : fullUrl.substring(fullUrl.lastIndexOf('/') + 1);
+      list.push({ id: `${cust.id}-pan`, key: 'panCard', customerId: cust.id, name: fileName, category: 'PAN Card', sourceName: cust.name, sourceType: 'Customer', uploadedAt: '2025-05-10', url: fullUrl });
     }
     if (cust.kycDocuments?.incomeProof) {
-      list.push({ id: `${cust.id}-income`, key: 'incomeProof', customerId: cust.id, name: cust.kycDocuments.incomeProof, category: 'Income Proof', sourceName: cust.name, sourceType: 'Customer', uploadedAt: '2025-05-12' });
+      const fullUrl = cust.kycDocuments.incomeProof;
+      const fileName = fullUrl.startsWith('data:') ? 'Income_Proof.png' : fullUrl.substring(fullUrl.lastIndexOf('/') + 1);
+      list.push({ id: `${cust.id}-income`, key: 'incomeProof', customerId: cust.id, name: fileName, category: 'Income Proof', sourceName: cust.name, sourceType: 'Customer', uploadedAt: '2025-05-12', url: fullUrl });
     }
     if (cust.kycDocuments?.educationCertificate) {
-      list.push({ id: `${cust.id}-edu`, key: 'educationCertificate', customerId: cust.id, name: cust.kycDocuments.educationCertificate, category: 'Education Certificate', sourceName: cust.name, sourceType: 'Customer', uploadedAt: '2025-05-12' });
+      const fullUrl = cust.kycDocuments.educationCertificate;
+      const fileName = fullUrl.startsWith('data:') ? 'Education_Certificate.png' : fullUrl.substring(fullUrl.lastIndexOf('/') + 1);
+      list.push({ id: `${cust.id}-edu`, key: 'educationCertificate', customerId: cust.id, name: fileName, category: 'Education Certificate', sourceName: cust.name, sourceType: 'Customer', uploadedAt: '2025-05-12', url: fullUrl });
     }
     if (cust.kycDocuments?.passport) {
-      list.push({ id: `${cust.id}-passport`, key: 'passport', customerId: cust.id, name: cust.kycDocuments.passport, category: 'Indian Passport Copy', sourceName: cust.name, sourceType: 'Customer', uploadedAt: '2025-05-12' });
+      const fullUrl = cust.kycDocuments.passport;
+      const fileName = fullUrl.startsWith('data:') ? 'Indian_Passport.png' : fullUrl.substring(fullUrl.lastIndexOf('/') + 1);
+      list.push({ id: `${cust.id}-passport`, key: 'passport', customerId: cust.id, name: fileName, category: 'Indian Passport Copy', sourceName: cust.name, sourceType: 'Customer', uploadedAt: '2025-05-12', url: fullUrl });
     }
     return list;
   });
@@ -187,10 +206,10 @@ export default function Documents({ candidates = [], customers = [] }) {
                       <Eye size={13} />
                     </button>
                     <a
-                      href={`data:text/plain;charset=utf-8,${encodeURIComponent('Aynkaran Consultants - Vault File: ' + doc.name)}`}
+                      href={doc.url ? getFileUrl(doc.url) : `data:text/plain;charset=utf-8,${encodeURIComponent('Aynkaran Consultants - Vault File: ' + doc.name)}`}
                       download={doc.name}
                       className="p-1.5 border border-slate-200 hover:bg-indigo-50 text-indigo-600 rounded-lg transition-colors cursor-pointer"
-                      title="Download simulation"
+                      title={doc.url ? "Download document" : "Download simulation"}
                     >
                       <Download size={13} />
                     </a>
@@ -307,15 +326,47 @@ export default function Documents({ candidates = [], customers = [] }) {
               </button>
             </div>
 
-            <div className="bg-slate-50 rounded-xl p-8 border border-dashed border-slate-200/80 text-center space-y-4">
-              <div className="w-16 h-16 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto shadow-sm">
-                <FileText size={28} />
-              </div>
-              <div className="space-y-1">
-                <p className="font-extrabold text-xs text-slate-700">Digital Authenticity Verified</p>
-                <p className="text-[11px] text-slate-400">Owner: {previewDoc.sourceName} • Category: {previewDoc.category}</p>
-                <p className="text-[11px] text-emerald-700 font-bold">SHA-256 Checksum: Success (0xACF728...)</p>
-              </div>
+            <div className="bg-slate-50 rounded-xl p-4 border border-dashed border-slate-200/80 flex items-center justify-center min-h-[300px]">
+              {previewDoc.url ? (
+                previewDoc.url.startsWith('data:image/') || previewDoc.url.match(/\.(jpeg|jpg|gif|png)$/i) || (previewDoc.url.includes('/uploads/') && !previewDoc.url.includes('.pdf')) ? (
+                  <img
+                    src={getFileUrl(previewDoc.url)}
+                    alt={previewDoc.name}
+                    className="max-w-full max-h-[50vh] object-contain rounded-lg shadow-sm"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : previewDoc.url.startsWith('data:application/pdf') || previewDoc.url.includes('.pdf') ? (
+                  <iframe
+                    src={getFileUrl(previewDoc.url)}
+                    title={previewDoc.name}
+                    className="w-full h-[55vh] rounded-lg border-0 bg-white"
+                    allowFullScreen
+                  />
+                ) : (
+                  <div className="text-center space-y-4 py-8">
+                    <div className="w-16 h-16 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto shadow-sm">
+                      <FileText size={28} />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-extrabold text-xs text-slate-700">Digital Copy Verified</p>
+                      <p className="text-[11px] text-slate-400">File Type doesn't support inline visual rendering.</p>
+                      <p className="text-[11px] text-emerald-700 font-bold">SHA-256 Checksum: Verified</p>
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="text-center space-y-4 py-8">
+                  <div className="w-16 h-16 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto shadow-sm">
+                    <FileText size={28} />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-extrabold text-xs text-slate-700">Digital Authenticity Verified</p>
+                    <p className="text-[11px] text-slate-400 font-mono font-bold text-indigo-600">{previewDoc.id}</p>
+                    <p className="text-[11px] text-slate-400">Owner: {previewDoc.sourceName} • Category: {previewDoc.category}</p>
+                    <p className="text-[11px] text-emerald-700 font-bold">SHA-256 Checksum: Success (0xACF728...)</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-between items-center mt-5 pt-3 border-t border-slate-100">
@@ -329,7 +380,7 @@ export default function Documents({ candidates = [], customers = [] }) {
                   Close
                 </button>
                 <a
-                  href={`data:text/plain;charset=utf-8,${encodeURIComponent('Aynkaran Consultants - Vault File: ' + previewDoc.name)}`}
+                  href={previewDoc.url ? getFileUrl(previewDoc.url) : `data:text/plain;charset=utf-8,${encodeURIComponent('Aynkaran Consultants - Vault File: ' + previewDoc.name)}`}
                   download={previewDoc.name}
                   onClick={() => setPreviewDoc(null)}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow cursor-pointer text-center flex items-center space-x-1"

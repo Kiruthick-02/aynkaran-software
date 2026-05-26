@@ -3,12 +3,19 @@ import { useApp } from '../context/AppContext';
 import Recruitment from '../modules/recruitment/Recruitment';
 
 export default function RecruitmentPage() {
-  const { candidates, setCandidates } = useApp();
+  const {
+    candidates,
+    addCandidate,
+    updateCandidate,
+    deleteCandidate
+  } = useApp();
 
   return (
     <Recruitment
       candidates={candidates}
-      setCandidates={setCandidates}
+      addCandidate={addCandidate}
+      updateCandidate={updateCandidate}
+      deleteCandidate={deleteCandidate}
     />
   );
 }

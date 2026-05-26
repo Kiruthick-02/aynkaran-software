@@ -1,4 +1,8 @@
 import React, { useState } from 'react';
+import { compressImageToBase64, dataURLtoFile } from '../../utils/imageCompressor';
+import { apiService } from '../../services/api';
+import { useApp } from '../../context/AppContext';
+import API_URL from '../../config/api';
 import {
   UserPlus,
   CheckCircle2,
@@ -32,7 +36,15 @@ export const RECRUITMENT_STAGES = [
   'Reschedule Exam',
 ];
 
-export default function Recruitment({ candidates = [], setCandidates }) {
+const getFileUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('data:')) return url;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return `${API_URL || ''}${url}`;
+};
+
+export default function Recruitment({ candidates = [], addCandidate, updateCandidate, deleteCandidate }) {
+  const { loadStateFromServer } = useApp();
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [isAddingCandidate, setIsAddingCandidate] = useState(false);
 
@@ -56,6 +68,15 @@ export default function Recruitment({ candidates = [], setCandidates }) {
 
   const [uploadCategory, setUploadCategory] = useState('Aadhaar');
   const [uploadFileName, setUploadFileName] = useState('');
+
+  React.useEffect(() => {
+    if (selectedCandidate) {
+      const current = candidates.find(c => c.id === selectedCandidate.id);
+      if (current) {
+        setSelectedCandidate(current);
+      }
+    }
+  }, [candidates, selectedCandidate?.id]);
 
   const isStuck = (pendingDateStr) => {
     const pendingDate = new Date(pendingDateStr);
@@ -95,7 +116,7 @@ export default function Recruitment({ candidates = [], setCandidates }) {
       notes: newNotes,
     };
 
-    setCandidates((prev) => [newCand, ...prev]);
+    addCandidate(newCand);
     setIsAddingCandidate(false);
     setNewName('');
     setNewMobile('');
@@ -105,112 +126,92 @@ export default function Recruitment({ candidates = [], setCandidates }) {
   };
 
   const promoteCandidateStage = (candId, nextStage) => {
-    setCandidates((prev) =>
-      prev.map((c) => {
-        if (c.id !== candId) return c;
+    const c = candidates.find((item) => item.id === candId);
+    if (!c) return;
 
-        const updatedFees = { ...c.fees };
-        const updatedExam = { ...c.exam };
-        let finalStage = nextStage;
+    const updatedFees = { ...c.fees };
+    const updatedExam = { ...c.exam };
+    let finalStage = nextStage;
 
-        if (nextStage === 'Result (Yes/No)') {
-          // default meeting results
-        } else if (nextStage === 'Fee Collection') {
-          updatedFees.applicationFeePaid = true;
-          updatedFees.appFeeAmount = parseFloat(tempRegFeeAmount) || 150;
-          updatedFees.appFeeDate = new Date().toISOString().split('T')[0];
-        } else if (nextStage === 'Training Fee Collection') {
-          updatedFees.trainingFeePaid = true;
-          updatedFees.trainingFeeAmount = parseFloat(tempTrainFeeAmount) || 250;
-          updatedFees.trainingFeeDate = new Date().toISOString().split('T')[0];
-        } else if (nextStage === 'Schedule Exam') {
-          updatedExam.scheduledDate = tempExamDate || new Date().toISOString().split('T')[0];
-        } else if (nextStage === 'Exam Result') {
-          updatedExam.score = parseInt(tempExamScore) || 0;
-          updatedExam.result = tempExamResult;
-        } else if (nextStage === 'Pass/Fail') {
-          if (c.exam?.result === 'Fail') {
-            finalStage = 'Reschedule Exam';
-          }
-        } else if (nextStage === 'Generate Agent Code') {
-          updatedExam.agentCodeGenerated = tempAgentCode || `AGN-AYN-${Math.floor(1000 + Math.random() * 9000)}`;
-        }
+    if (nextStage === 'Result (Yes/No)') {
+      // default meeting results
+    } else if (nextStage === 'Fee Collection') {
+      updatedFees.applicationFeePaid = true;
+      updatedFees.appFeeAmount = parseFloat(tempRegFeeAmount) || 150;
+      updatedFees.appFeeDate = new Date().toISOString().split('T')[0];
+    } else if (nextStage === 'Training Fee Collection') {
+      updatedFees.trainingFeePaid = true;
+      updatedFees.trainingFeeAmount = parseFloat(tempTrainFeeAmount) || 250;
+      updatedFees.trainingFeeDate = new Date().toISOString().split('T')[0];
+    } else if (nextStage === 'Schedule Exam') {
+      updatedExam.scheduledDate = tempExamDate || new Date().toISOString().split('T')[0];
+    } else if (nextStage === 'Exam Result') {
+      updatedExam.score = parseInt(tempExamScore) || 0;
+      updatedExam.result = tempExamResult;
+    } else if (nextStage === 'Pass/Fail') {
+      if (c.exam?.result === 'Fail') {
+        finalStage = 'Reschedule Exam';
+      }
+    } else if (nextStage === 'Generate Agent Code') {
+      updatedExam.agentCodeGenerated = tempAgentCode || `AGN-AYN-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
 
-        const newHistory = [
-          ...c.stageHistory,
-          {
-            stage: finalStage,
-            date: new Date().toISOString().split('T')[0],
-            note: stageNote || `Status updated in pipeline to ${finalStage}`,
-          },
-        ];
+    const newHistory = [
+      ...c.stageHistory,
+      {
+        stage: finalStage,
+        date: new Date().toISOString().split('T')[0],
+        note: stageNote || `Status updated in pipeline to ${finalStage}`,
+      },
+    ];
 
-        const updatedCand = {
-          ...c,
-          currentStage: finalStage,
-          stageHistory: newHistory,
-          fees: updatedFees,
-          exam: updatedExam,
-          pendingStageSince: new Date().toISOString().split('T')[0],
-        };
+    const updatedCand = {
+      ...c,
+      currentStage: finalStage,
+      stageHistory: newHistory,
+      fees: updatedFees,
+      exam: updatedExam,
+      pendingStageSince: new Date().toISOString().split('T')[0],
+    };
 
-        if (selectedCandidate && selectedCandidate.id === candId) {
-          setSelectedCandidate(updatedCand);
-        }
-
-        return updatedCand;
-      })
-    );
+    updateCandidate(candId, updatedCand);
+    if (selectedCandidate && selectedCandidate.id === candId) {
+      setSelectedCandidate(updatedCand);
+    }
 
     setStageNote('');
   };
 
-  const handleRealUpload = (candId, fileName, fileData) => {
-    if (!fileName) return;
+  const handleRealUpload = async (candId, file) => {
+    if (!file) return;
 
-    setCandidates((prev) =>
-      prev.map((c) => {
-        if (c.id !== candId) return c;
+    const c = candidates.find((item) => item.id === candId);
+    if (!c) return;
 
-        const newDoc = {
-          id: `doc-${Date.now().toString().substring(9)}`,
-          name: fileName,
-          category: uploadCategory,
-          url: fileData || '#',
-          uploadedAt: new Date().toISOString().split('T')[0],
-        };
-
-        const updated = {
-          ...c,
-          documents: [...(c.documents || []), newDoc],
-        };
-
-        if (selectedCandidate && selectedCandidate.id === candId) {
-          setSelectedCandidate(updated);
-        }
-
-        return updated;
-      })
-    );
+    try {
+      await apiService.uploadDocument(file, uploadCategory, candId, 'recruitment');
+      await loadStateFromServer();
+    } catch (err) {
+      console.error('[Candidate Multi-part Upload Error]', err);
+    }
   };
 
   const handleDocumentDelete = (candId, docId) => {
-    setCandidates((prev) =>
-      prev.map((c) => {
-        if (c.id !== candId) return c;
-        const updatedDocs = (c.documents || []).filter((d) => d.id !== docId);
-        const updated = { ...c, documents: updatedDocs };
-        if (selectedCandidate && selectedCandidate.id === candId) {
-          setSelectedCandidate(updated);
-        }
-        return updated;
-      })
-    );
+    const c = candidates.find((item) => item.id === candId);
+    if (!c) return;
+
+    const updatedDocs = (c.documents || []).filter((d) => d.id !== docId);
+    const updated = { ...c, documents: updatedDocs };
+
+    updateCandidate(candId, updated);
+    if (selectedCandidate && selectedCandidate.id === candId) {
+      setSelectedCandidate(updated);
+    }
   };
 
   const handleDeleteCandidate = (id) => {
     if (confirm('Are you sure you want to delete this candidate from recruitment database? This action is irreversible.')) {
-      setCandidates((prev) => prev.filter((c) => c.id !== id));
+      deleteCandidate(id);
       setSelectedCandidate(null);
     }
   };
@@ -609,14 +610,17 @@ export default function Recruitment({ candidates = [], setCandidates }) {
                       id="candidate-file-uploader"
                       accept="image/*,application/pdf"
                       className="hidden"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         if (e.target.files && e.target.files[0]) {
                           const file = e.target.files[0];
-                          const reader = new FileReader();
-                          reader.onload = () => {
-                            handleRealUpload(selectedCandidate.id, file.name, reader.result);
-                          };
-                          reader.readAsDataURL(file);
+                          const compressed = await compressImageToBase64(file);
+                          if (compressed) {
+                            if (file.type && file.type.startsWith('image/')) {
+                              handleRealUpload(selectedCandidate.id, dataURLtoFile(compressed, file.name));
+                            } else {
+                              handleRealUpload(selectedCandidate.id, file);
+                            }
+                          }
                         }
                       }}
                     />
@@ -818,16 +822,16 @@ export default function Recruitment({ candidates = [], setCandidates }) {
             </div>
 
             <div className="flex-1 overflow-y-auto bg-slate-50 rounded-xl p-4 border border-slate-100 flex items-center justify-center min-h-[300px]">
-              {previewDocUrl.startsWith('data:image/') || previewDocUrl.match(/\.(jpeg|jpg|gif|png)$/i) ? (
+              {previewDocUrl.startsWith('data:image/') || previewDocUrl.match(/\.(jpeg|jpg|gif|png)$/i) || (previewDocUrl.includes('/uploads/') && !previewDocUrl.includes('.pdf')) ? (
                 <img
-                  src={previewDocUrl}
+                  src={getFileUrl(previewDocUrl)}
                   alt={previewDocName}
                   className="max-w-full max-h-[50vh] object-contain rounded-lg shadow-sm"
                   referrerPolicy="no-referrer"
                 />
-              ) : previewDocUrl.startsWith('data:application/pdf') || previewDocUrl.includes('.pdf') || previewDocUrl.includes('/uploads/recruitment/') ? (
+              ) : previewDocUrl.startsWith('data:application/pdf') || previewDocUrl.includes('.pdf') ? (
                 <iframe
-                  src={previewDocUrl}
+                  src={getFileUrl(previewDocUrl)}
                   title={previewDocName}
                   className="w-full h-[55vh] rounded-lg border-0 bg-white"
                   allowFullScreen
@@ -861,7 +865,7 @@ export default function Recruitment({ candidates = [], setCandidates }) {
                   Close Viewer
                 </button>
                 <a
-                  href={previewDocUrl}
+                  href={getFileUrl(previewDocUrl)}
                   download={previewDocName}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow cursor-pointer text-center flex items-center space-x-1"
                 >

@@ -30,27 +30,55 @@ export class DocumentController {
       };
 
       if (targetType === 'recruitment') {
-        const candidate = await this.db.collection('candidates').findOne({ id: targetId });
-        if (!candidate) return res.status(404).json({ error: 'Candidate file target not found.' });
+        if (this.db && typeof this.db.collection === 'function') {
+          const candidate = await this.db.collection('candidates').findOne({ id: targetId });
+          if (!candidate) return res.status(404).json({ error: 'Candidate file target not found.' });
 
-        const docs = typeof candidate.documents === 'string' ? JSON.parse(candidate.documents || '[]') : (candidate.documents || []);
-        docs.push(newDoc);
+          const docs = typeof candidate.documents === 'string' ? JSON.parse(candidate.documents || '[]') : (candidate.documents || []);
+          docs.push(newDoc);
 
-        await this.db.collection('candidates').updateOne(
-          { id: targetId },
-          { $set: { documents: docs } }
-        );
+          await this.db.collection('candidates').updateOne(
+            { id: targetId },
+            { $set: { documents: docs } }
+          );
+        } else {
+          const candidate = this.db.candidates?.find(c => c.id === targetId);
+          if (!candidate) return res.status(404).json({ error: 'Candidate file target not found.' });
+          candidate.documents = candidate.documents || [];
+          candidate.documents.push(newDoc);
+          try {
+            const fs = await import('fs');
+            const path = await import('path');
+            fs.writeFileSync(path.join(process.cwd(), 'database.json'), JSON.stringify(this.db, null, 2), 'utf-8');
+          } catch (e) {
+            console.error('Failed to write database file', e);
+          }
+        }
       } else if (targetType === 'customers') {
-        const customer = await this.db.collection('customers').findOne({ id: targetId });
-        if (!customer) return res.status(404).json({ error: 'Customer ledger target not found.' });
+        if (this.db && typeof this.db.collection === 'function') {
+          const customer = await this.db.collection('customers').findOne({ id: targetId });
+          if (!customer) return res.status(404).json({ error: 'Customer ledger target not found.' });
 
-        const kyc = typeof customer.kycDocuments === 'string' ? JSON.parse(customer.kycDocuments || '{}') : (customer.kycDocuments || {});
-        kyc[category || 'other'] = fileUrl;
+          const kyc = typeof customer.kycDocuments === 'string' ? JSON.parse(customer.kycDocuments || '{}') : (customer.kycDocuments || {});
+          kyc[category || 'other'] = fileUrl;
 
-        await this.db.collection('customers').updateOne(
-          { id: targetId },
-          { $set: { kycDocuments: kyc } }
-        );
+          await this.db.collection('customers').updateOne(
+            { id: targetId },
+            { $set: { kycDocuments: kyc } }
+          );
+        } else {
+          const customer = this.db.customers?.find(c => c.id === targetId);
+          if (!customer) return res.status(404).json({ error: 'Customer ledger target not found.' });
+          customer.kycDocuments = customer.kycDocuments || {};
+          customer.kycDocuments[category || 'other'] = fileUrl;
+          try {
+            const fs = await import('fs');
+            const path = await import('path');
+            fs.writeFileSync(path.join(process.cwd(), 'database.json'), JSON.stringify(this.db, null, 2), 'utf-8');
+          } catch (e) {
+            console.error('Failed to write database file', e);
+          }
+        }
       }
 
       res.status(201).json({ success: true, document: newDoc });

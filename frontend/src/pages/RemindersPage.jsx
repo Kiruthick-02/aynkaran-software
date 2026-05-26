@@ -3,12 +3,19 @@ import { useApp } from '../context/AppContext';
 import Reminders from '../modules/reminders/Reminders';
 
 export default function RemindersPage() {
-  const { reminders, setReminders } = useApp();
+  const {
+    reminders,
+    addReminder,
+    updateReminder,
+    deleteReminder
+  } = useApp();
 
   return (
     <Reminders
       reminders={reminders}
-      setReminders={setReminders}
+      addReminder={addReminder}
+      updateReminder={updateReminder}
+      deleteReminder={deleteReminder}
     />
   );
 }

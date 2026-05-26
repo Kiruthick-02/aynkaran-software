@@ -1,4 +1,8 @@
 import React, { useState, useRef } from 'react';
+import { compressImageToBase64, dataURLtoFile } from '../../utils/imageCompressor';
+import API_URL from '../../config/api';
+import { apiService } from '../../services/api';
+import { useApp } from '../../context/AppContext';
 import {
   Users,
   Search,
@@ -77,7 +81,15 @@ function DualDateInput({ value, onChange, placeholder = "YYYY-MM-DD", required =
   );
 }
 
-export default function Customers({ customers = [], setCustomers, policies = [] }) {
+const getFileUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('data:')) return url;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return `${API_URL || ''}${url}`;
+};
+
+export default function Customers({ customers = [], addCustomer, updateCustomer, deleteCustomer, policies = [] }) {
+  const { loadStateFromServer } = useApp();
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
@@ -94,8 +106,10 @@ export default function Customers({ customers = [], setCustomers, policies = [] 
   const [incomeProof, setIncomeProof] = useState('');
   const [educationCertificate, setEducationCertificate] = useState('');
   const [aadhaarCard, setAadhaarCard] = useState('');
+  const [aadhaarFile, setAadhaarFile] = useState(null);
   const [panCard, setPanCard] = useState('');
   const [passportSizePhoto, setPassportSizePhoto] = useState('');
+  const [photoFile, setPhotoFile] = useState(null);
   const [signatureCopy, setSignatureCopy] = useState('');
   const [passport, setPassport] = useState('');
 
@@ -107,7 +121,7 @@ export default function Customers({ customers = [], setCustomers, policies = [] 
   const [nomineeDob, setNomineeDob] = useState('');
   const [nomineeRelationship, setNomineeRelationship] = useState('');
 
-  const [annualIncome, setAnnualIncome] = useState('600000');
+  const [annualIncome, setAnnualIncome] = useState('');
   const [occupation, setOccupation] = useState('');
 
   const [docFileVal, setDocFileVal] = useState('');
@@ -115,67 +129,88 @@ export default function Customers({ customers = [], setCustomers, policies = [] 
   const [isPhotoDragging, setIsPhotoDragging] = useState(false);
 
   // File Upload Handlers for Aadhaar & Passport Photo dropzones
-  const handleAadhaarDrop = (e) => {
+  const handleAadhaarDrop = async (e) => {
     e.preventDefault();
     setIsAadhaarDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      const reader = new FileReader();
-      reader.onload = () => {
-        setAadhaarCard(reader.result);
-      };
-      reader.readAsDataURL(file);
+      const compressed = await compressImageToBase64(file);
+      if (compressed) {
+        setAadhaarCard(compressed);
+        if (file.type && file.type.startsWith('image/')) {
+          setAadhaarFile(dataURLtoFile(compressed, file.name));
+        } else {
+          setAadhaarFile(file);
+        }
+      }
     }
   };
 
-  const handleAadhaarSelect = (e) => {
+  const handleAadhaarSelect = async (e) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onload = () => {
-        setAadhaarCard(reader.result);
-      };
-      reader.readAsDataURL(file);
+      const compressed = await compressImageToBase64(file);
+      if (compressed) {
+        setAadhaarCard(compressed);
+        if (file.type && file.type.startsWith('image/')) {
+          setAadhaarFile(dataURLtoFile(compressed, file.name));
+        } else {
+          setAadhaarFile(file);
+        }
+      }
     }
   };
 
-  const handlePhotoDrop = (e) => {
+  const handlePhotoDrop = async (e) => {
     e.preventDefault();
     setIsPhotoDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      const reader = new FileReader();
-      reader.onload = () => {
-        setPassportSizePhoto(reader.result);
-      };
-      reader.readAsDataURL(file);
+      const compressed = await compressImageToBase64(file);
+      if (compressed) {
+        setPassportSizePhoto(compressed);
+        if (file.type && file.type.startsWith('image/')) {
+          setPhotoFile(dataURLtoFile(compressed, file.name));
+        } else {
+          setPhotoFile(file);
+        }
+      }
     }
   };
 
-  const handlePhotoSelect = (e) => {
+  const handlePhotoSelect = async (e) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onload = () => {
-        setPassportSizePhoto(reader.result);
-      };
-      reader.readAsDataURL(file);
+      const compressed = await compressImageToBase64(file);
+      if (compressed) {
+        setPassportSizePhoto(compressed);
+        if (file.type && file.type.startsWith('image/')) {
+          setPhotoFile(dataURLtoFile(compressed, file.name));
+        } else {
+          setPhotoFile(file);
+        }
+      }
     }
   };
 
   // Direct KYC modification helper for document slots
   const handleAddDirectKYC = (category, dataUrl) => {
     if (!selectedCustomerId) return;
-    setCustomers((prev) =>
-      prev.map((c) => {
-        if (c.id !== selectedCustomerId) return c;
-        const updatedKyc = { ...c.kycDocuments, [category]: dataUrl || undefined };
-        return {
-          ...c,
-          kycDocuments: updatedKyc
-        };
-      })
-    );
+    const cust = customers.find((c) => c.id === selectedCustomerId);
+    if (cust) {
+      const updatedKyc = { ...cust.kycDocuments, [category]: dataUrl || undefined };
+      updateCustomer(selectedCustomerId, { kycDocuments: updatedKyc });
+    }
+  };
+
+  const handleAddDirectKYCFile = async (category, file) => {
+    if (!selectedCustomerId || !file) return;
+    try {
+      await apiService.uploadDocument(file, category, selectedCustomerId, 'customers');
+      await loadStateFromServer();
+    } catch (err) {
+      console.error('[Direct KYC Multi-part Upload Error]', err);
+    }
   };
 
   const activeCustomer = customers.find((c) => c.id === selectedCustomerId) || null;
@@ -208,13 +243,7 @@ export default function Customers({ customers = [], setCustomers, policies = [] 
       address,
       spouseName,
       kycDocuments: {
-        incomeProof: incomeProof || undefined,
-        educationCertificate: educationCertificate || undefined,
-        aadhaarCard: aadhaarCard || undefined,
-        panCard: panCard || undefined,
-        passportSizePhoto: finalPhoto || undefined,
-        signatureCopy: signatureCopy || undefined,
-        passport: passport || undefined,
+        passportSizePhoto: finalPhoto.startsWith('data:') ? undefined : finalPhoto
       },
       nominee: {
         name: nomineeName,
@@ -228,7 +257,28 @@ export default function Customers({ customers = [], setCustomers, policies = [] 
       createdAt: new Date().toISOString(),
     };
 
-    setCustomers((prev) => [newCust, ...prev]);
+    addCustomer(newCust).then(async (savedCustomer) => {
+      const actualId = savedCustomer?.id || newCust.id;
+
+      if (aadhaarFile) {
+        try {
+          await apiService.uploadDocument(aadhaarFile, 'aadhaarCard', actualId, 'customers');
+        } catch (err) {
+          console.error('Failed to upload Aadhaar document on register:', err);
+        }
+      }
+
+      if (photoFile) {
+        try {
+          await apiService.uploadDocument(photoFile, 'passportSizePhoto', actualId, 'customers');
+        } catch (err) {
+          console.error('Failed to upload passport photo on register:', err);
+        }
+      }
+
+      await loadStateFromServer();
+    });
+
     setSelectedCustomerId(newCust.id);
     setIsAddingCustomer(false);
 
@@ -243,40 +293,35 @@ export default function Customers({ customers = [], setCustomers, policies = [] 
     setIncomeProof('');
     setEducationCertificate('');
     setAadhaarCard('');
+    setAadhaarFile(null);
     setPanCard('');
     setPassportSizePhoto('');
+    setPhotoFile(null);
     setSignatureCopy('');
     setPassport('');
     setNomineeName('');
     setNomineeDob('');
     setNomineeRelationship('');
-    setAnnualIncome('600000');
+    setAnnualIncome('');
     setOccupation('');
   };
 
   const handleAddKYCDocument = (category) => {
     if (!selectedCustomerId || !docFileVal) return;
 
-    setCustomers((prev) =>
-      prev.map((c) => {
-        if (c.id !== selectedCustomerId) return c;
-
-        const updatedKyc = { ...c.kycDocuments };
-        updatedKyc[category] = docFileVal;
-
-        return {
-          ...c,
-          kycDocuments: updatedKyc,
-        };
-      })
-    );
+    const cust = customers.find((c) => c.id === selectedCustomerId);
+    if (cust) {
+      const updatedKyc = { ...cust.kycDocuments };
+      updatedKyc[category] = docFileVal;
+      updateCustomer(selectedCustomerId, { kycDocuments: updatedKyc });
+    }
 
     setDocFileVal('');
   };
 
   const handleDeleteCustomer = (id) => {
     if (confirm('Are you sure you want to permanently delete this customer profile? Linked sales history will lose CRM anchors.')) {
-      setCustomers((prev) => prev.filter((c) => c.id !== id));
+      deleteCustomer(id);
       if (selectedCustomerId === id) {
         setSelectedCustomerId(customers[0]?.id || null);
       }
@@ -335,7 +380,7 @@ export default function Customers({ customers = [], setCustomers, policies = [] 
                 >
                   <img
                     referrerPolicy="no-referrer"
-                    src={cust.kycDocuments?.passportSizePhoto || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cust.name)}`}
+                    src={cust.kycDocuments?.passportSizePhoto ? getFileUrl(cust.kycDocuments.passportSizePhoto) : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cust.name)}`}
                     alt={cust.name}
                     className="w-10 h-10 rounded-full border border-slate-200 object-cover bg-slate-100 shrink-0"
                   />
@@ -370,11 +415,21 @@ export default function Customers({ customers = [], setCustomers, policies = [] 
             <div className="space-y-6">
               <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-5">
-                  <div className="relative">
+                  <div
+                    className={`relative ${activeCustomer.kycDocuments?.passportSizePhoto ? 'cursor-pointer' : ''}`}
+                    onClick={() => {
+                      if (activeCustomer.kycDocuments?.passportSizePhoto) {
+                        setPreviewDocUrl(activeCustomer.kycDocuments.passportSizePhoto);
+                        setPreviewDocName('passportSizePhoto.png');
+                        setPreviewDocCategory('Passport Size Photo');
+                      }
+                    }}
+                    title={activeCustomer.kycDocuments?.passportSizePhoto ? "Click to preview full photo" : ""}
+                  >
                     <img
                       referrerPolicy="no-referrer"
-                      src={activeCustomer.kycDocuments?.passportSizePhoto || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(activeCustomer.name)}`}
-                      className="w-20 h-20 rounded-2xl object-cover bg-slate-50 border-2 border-indigo-600/30 shadow-md"
+                      src={activeCustomer.kycDocuments?.passportSizePhoto ? getFileUrl(activeCustomer.kycDocuments.passportSizePhoto) : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(activeCustomer.name)}`}
+                      className={`w-20 h-20 rounded-2xl object-cover bg-slate-50 border-2 border-indigo-600/30 shadow-md transition-transform ${activeCustomer.kycDocuments?.passportSizePhoto ? 'hover:scale-105' : ''}`}
                       alt={activeCustomer.name}
                     />
                     <span className="absolute -bottom-1.5 -right-1.5 bg-indigo-600 text-[9px] text-white px-1.5 py-0.5 rounded font-bold uppercase shadow-sm">
@@ -476,6 +531,7 @@ export default function Customers({ customers = [], setCustomers, policies = [] 
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   {[
+                    { label: 'Passport Size Photo', key: 'passportSizePhoto', desc: 'Applicant profile picture' },
                     { label: 'Aadhaar Card copy', key: 'aadhaarCard', desc: 'UIDAI Address proof' },
                     { label: 'PAN Card copy', key: 'panCard', desc: 'Income tax card ID' },
                     { label: 'Income Proof certificate', key: 'incomeProof', desc: 'Salary slip or Form 16' },
@@ -504,13 +560,13 @@ export default function Customers({ customers = [], setCustomers, policies = [] 
                               className="text-[10px] text-emerald-800 font-extrabold truncate max-w-[110px] hover:underline cursor-pointer flex items-center space-x-1"
                               onClick={() => {
                                 setPreviewDocUrl(value);
-                                setPreviewDocName(slot.key === 'passportSizePhoto' ? 'Photo.png' : 'Attachment.pdf');
+                                setPreviewDocName(slot.key === 'passportSizePhoto' ? 'Photo.png' : value.startsWith('data:') ? 'Attachment.pdf' : value.substring(value.lastIndexOf('/') + 1));
                                 setPreviewDocCategory(slot.label);
                               }}
                               title="Click to preview document inline"
                             >
                               <Eye size={10} className="inline mr-0.5 text-emerald-600" />
-                              <span>{value.startsWith('data:') ? (slot.key === 'passportSizePhoto' ? 'Photo.png' : 'Attachment.pdf') : value}</span>
+                              <span>{value.startsWith('data:') ? (slot.key === 'passportSizePhoto' ? 'Photo.png' : 'Attachment.pdf') : value.substring(value.lastIndexOf('/') + 1)}</span>
                             </span>
                             <div className="flex items-center space-x-1">
                               <span className="text-[8px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-extrabold">Verified</span>
@@ -531,14 +587,17 @@ export default function Customers({ customers = [], setCustomers, policies = [] 
                               id={`file-vault-${slot.key}`}
                               accept={slot.key === 'passportSizePhoto' ? 'image/*' : 'image/*,application/pdf'}
                               className="hidden"
-                              onChange={(e) => {
+                              onChange={async (e) => {
                                 if (e.target.files && e.target.files[0]) {
                                   const file = e.target.files[0];
-                                  const reader = new FileReader();
-                                  reader.onload = () => {
-                                    handleAddDirectKYC(slot.key, reader.result);
-                                  };
-                                  reader.readAsDataURL(file);
+                                  const compressed = await compressImageToBase64(file);
+                                  if (compressed) {
+                                    if (file.type && file.type.startsWith('image/')) {
+                                      handleAddDirectKYCFile(slot.key, dataURLtoFile(compressed, file.name));
+                                    } else {
+                                      handleAddDirectKYCFile(slot.key, file);
+                                    }
+                                  }
                                 }
                               }}
                             />
@@ -905,16 +964,16 @@ export default function Customers({ customers = [], setCustomers, policies = [] 
             </div>
 
             <div className="flex-1 overflow-y-auto bg-slate-50 rounded-xl p-4 border border-slate-100 flex items-center justify-center min-h-[300px]">
-              {previewDocUrl.startsWith('data:image/') ? (
+              {previewDocUrl.startsWith('data:image/') || previewDocUrl.match(/\.(jpeg|jpg|gif|png)$/i) || (previewDocUrl.includes('/uploads/') && !previewDocUrl.includes('.pdf')) ? (
                 <img
-                  src={previewDocUrl}
+                  src={getFileUrl(previewDocUrl)}
                   alt={previewDocName}
                   className="max-w-full max-h-[50vh] object-contain rounded-lg shadow-sm"
                   referrerPolicy="no-referrer"
                 />
               ) : previewDocUrl.startsWith('data:application/pdf') || previewDocUrl.includes('.pdf') ? (
                 <iframe
-                  src={previewDocUrl}
+                  src={getFileUrl(previewDocUrl)}
                   title={previewDocName}
                   className="w-full h-[55vh] rounded-lg border-0 bg-white"
                   allowFullScreen
@@ -948,7 +1007,7 @@ export default function Customers({ customers = [], setCustomers, policies = [] 
                   Close Viewer
                 </button>
                 <a
-                  href={previewDocUrl}
+                  href={getFileUrl(previewDocUrl)}
                   download={previewDocName}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow cursor-pointer text-center flex items-center space-x-1"
                 >

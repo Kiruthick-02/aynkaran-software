@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { apiService } from '../services/api';
 
 const AppContext = createContext();
@@ -41,35 +41,7 @@ export function AppProvider({ children }) {
   const [isServerLoaded, setIsServerLoaded] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
 
-  // Load state from back-end server REST API on startup
-  const loadStateFromServer = async () => {
-    try {
-      const [custData, candData, polData, remData] = await Promise.all([
-        apiService.getCustomers(),
-        apiService.getCandidates(),
-        apiService.getPolicies(),
-        apiService.getReminders()
-      ]);
-
-      setCustomers(custData);
-      setCandidates(candData);
-      setPolicies(polData);
-      setReminders(remData);
-      setIsOnline(true);
-      console.log('Successfully connected and loaded database from Express API endpoints');
-    } catch (err) {
-      console.warn('Express back-end API unreachable, operating on local ERP cached storage.', err);
-      setIsOnline(false);
-    } finally {
-      setIsServerLoaded(true);
-    }
-  };
-
-  useEffect(() => {
-    loadStateFromServer();
-  }, []);
-
-  // Synchronize changes to LocalStorage on updates (and push notifications back to backend API)
+  // Synchronize changes to LocalStorage on updates
   useEffect(() => {
     localStorage.setItem('ayn_customers', JSON.stringify(customers));
   }, [customers]);
@@ -90,33 +62,54 @@ export function AppProvider({ children }) {
     localStorage.setItem('ayn_reminders', JSON.stringify(reminders));
   }, [reminders]);
 
-  // Bulk Synchronizer to push state changes to the Server API
-  const pushStateToServer = async () => {
-    if (!isServerLoaded) return;
+  /**
+   * Load entire harmonized database dataset from MongoDB Express server
+   */
+  const loadStateFromServer = useCallback(async () => {
+    console.log('[System] Fetching latest CRM states from MongoDB database server...');
     try {
-      await apiService.syncDatabase({
-        customers,
-        candidates,
-        policies,
-        reminders
-      });
+      const [custs, cands, pols, rems] = await Promise.all([
+        apiService.getCustomers(),
+        apiService.getCandidates(),
+        apiService.getPolicies(),
+        apiService.getReminders()
+      ]);
+
+      if (Array.isArray(custs)) {
+        // Sort by createdAt desc
+        custs.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        setCustomers(custs);
+      }
+      if (Array.isArray(cands)) {
+        cands.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        setCandidates(cands);
+      }
+      if (Array.isArray(pols)) {
+        pols.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        setPolicies(pols);
+      }
+      if (Array.isArray(rems)) {
+        rems.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        setReminders(rems);
+      }
+
       setIsOnline(true);
+      setIsServerLoaded(true);
+      console.log('[System] State loaded successfully from MongoDB database.');
     } catch (error) {
-      console.warn('Incremental data sync failure (Server offline):', error);
+      console.warn('[Sync Error] Failed to stream from back-end REST API, utilizing local cache:', error);
       setIsOnline(false);
+      // Soft-load local cache as loaded
+      setIsServerLoaded(true);
     }
-  };
+  }, []);
 
-  // Run a debounced synchronized push when state changes
+  // Sync state from server once on load
   useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      pushStateToServer();
-    }, 1500);
+    loadStateFromServer();
+  }, [loadStateFromServer]);
 
-    return () => clearTimeout(delayDebounceFn);
-  }, [customers, candidates, policies, reminders, isServerLoaded]);
-
-  // Authentication handlers
+  // Authentication handlers (Standard login logic)
   const login = (username, password) => {
     const trimmedUser = username.trim();
     if (trimmedUser === 'admin' && password === 'admin@aynakaran') {
@@ -138,30 +131,38 @@ export function AppProvider({ children }) {
 
   // --- ACTIONS: CUSTOMER CRM SYSTEM ---
   const addCustomer = async (cust) => {
-    // Optimistic UI updates
+    const custId = cust.id || `cust-${Date.now().toString().substring(7)}`;
     const newCust = {
       ...cust,
-      id: cust.id || `cust-${Date.now().toString().substring(7)}`,
+      id: custId,
       createdAt: cust.createdAt || new Date().toISOString()
     };
-    
+
+    // Optimistic frontend update
     setCustomers(prev => [newCust, ...prev]);
-    
-    // Server fallback
+
     try {
-      await apiService.createCustomer(newCust);
+      const created = await apiService.createCustomer(newCust);
+      if (created && created.success !== false) {
+        setIsOnline(true);
+        // Sync back standard verified entity
+        setCustomers(prev => prev.map(c => c.id === custId ? { ...newCust, ...created.data } : c));
+        return { ...newCust, ...created.data };
+      }
     } catch (err) {
-      console.warn('Failed optimistically syncing client to server:', err);
+      console.error('[API Create Customer Error]', err);
     }
     return newCust;
   };
 
   const updateCustomer = async (id, updatedFields) => {
     setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...updatedFields } : c));
+
     try {
       await apiService.updateCustomer(id, updatedFields);
+      setIsOnline(true);
     } catch (err) {
-      console.warn('Failed server update for customer profile:', err);
+      console.error('[API Update Customer Error]', err);
     }
   };
 
@@ -169,33 +170,45 @@ export function AppProvider({ children }) {
     setCustomers(prev => prev.filter(c => c.id !== id));
     try {
       await apiService.deleteCustomer(id);
+      setIsOnline(true);
     } catch (err) {
-      console.warn('Failed server delete for customer profile:', err);
+      console.error('[API Delete Customer Error]', err);
     }
   };
 
   // --- ACTIONS: AGENT RECRUITMENT PIPELINE ---
   const addCandidate = async (cand) => {
+    const candId = cand.id || `cand-${Date.now().toString().substring(7)}`;
     const newCand = {
       ...cand,
-      id: cand.id || `cand-${Date.now().toString().substring(7)}`,
-      pendingStageSince: cand.pendingStageSince || new Date().toISOString().split('T')[0]
+      id: candId,
+      pendingStageSince: cand.pendingStageSince || new Date().toISOString().split('T')[0],
+      createdAt: cand.createdAt || new Date().toISOString()
     };
+
     setCandidates(prev => [newCand, ...prev]);
+
     try {
-      await apiService.createCandidate(newCand);
+      const created = await apiService.createCandidate(newCand);
+      if (created) {
+        setIsOnline(true);
+        setCandidates(prev => prev.map(c => c.id === candId ? { ...newCand, ...created.data } : c));
+        return { ...newCand, ...created.data };
+      }
     } catch (err) {
-      console.warn('Failed optimistic candidate server creation:', err);
+      console.error('[API Create Candidate Error]', err);
     }
     return newCand;
   };
 
   const updateCandidate = async (id, updatedFields) => {
     setCandidates(prev => prev.map(c => c.id === id ? { ...c, ...updatedFields } : c));
+
     try {
       await apiService.updateCandidate(id, updatedFields);
+      setIsOnline(true);
     } catch (err) {
-      console.warn('Failed server update for candidate profile:', err);
+      console.error('[API Update Candidate Error]', err);
     }
   };
 
@@ -203,23 +216,33 @@ export function AppProvider({ children }) {
     setCandidates(prev => prev.filter(c => c.id !== id));
     try {
       await apiService.deleteCandidate(id);
+      setIsOnline(true);
     } catch (err) {
-      console.warn('Failed server delete for candidate:', err);
+      console.error('[API Delete Candidate Error]', err);
     }
   };
 
   // --- ACTIONS: POLICY SALES SYSTEM ---
   const addPolicy = async (policy) => {
+    const polId = policy.id || `pol-${Date.now().toString().substring(7)}`;
     const newPolicy = {
       ...policy,
-      id: policy.id || `pol-${Date.now().toString().substring(7)}`,
-      pendingStageSince: policy.pendingStageSince || new Date().toISOString().split('T')[0]
+      id: polId,
+      pendingStageSince: policy.pendingStageSince || new Date().toISOString().split('T')[0],
+      createdAt: policy.createdAt || new Date().toISOString()
     };
+
     setPolicies(prev => [newPolicy, ...prev]);
+
     try {
-      await apiService.createPolicy(newPolicy);
+      const created = await apiService.createPolicy(newPolicy);
+      if (created) {
+        setIsOnline(true);
+        setPolicies(prev => prev.map(p => p.id === polId ? { ...newPolicy, ...created.data } : p));
+        return { ...newPolicy, ...created.data };
+      }
     } catch (err) {
-      console.warn('Failed optimistic policy server creation:', err);
+      console.error('[API Create Policy Error]', err);
     }
     return newPolicy;
   };
@@ -228,8 +251,9 @@ export function AppProvider({ children }) {
     setPolicies(prev => prev.map(p => p.id === id ? { ...p, ...updatedFields } : p));
     try {
       await apiService.updatePolicy(id, updatedFields);
+      setIsOnline(true);
     } catch (err) {
-      console.warn('Failed server update for policy lead:', err);
+      console.error('[API Update Policy Error]', err);
     }
   };
 
@@ -237,23 +261,28 @@ export function AppProvider({ children }) {
     setPolicies(prev => prev.filter(p => p.id !== id));
     try {
       await apiService.deletePolicy(id);
+      setIsOnline(true);
     } catch (err) {
-      console.warn('Failed server delete for policy lead:', err);
+      console.error('[API Delete Policy Error]', err);
     }
   };
 
   // --- ACTIONS: ALERTS & REMINDERS ---
   const addReminder = async (rem) => {
+    const remId = rem.id || `rem-${Date.now().toString().substring(7)}`;
     const newRem = {
       ...rem,
-      id: rem.id || `rem-${Date.now().toString().substring(7)}`,
+      id: remId,
       createdAt: rem.createdAt || new Date().toISOString()
     };
+
     setReminders(prev => [newRem, ...prev]);
+
     try {
       await apiService.createReminder(newRem);
+      setIsOnline(true);
     } catch (err) {
-      console.warn('Failed optimistic reminder server entry:', err);
+      console.error('[API Create Reminder Error]', err);
     }
   };
 
@@ -261,8 +290,19 @@ export function AppProvider({ children }) {
     setReminders(prev => prev.map(r => r.id === id ? { ...r, ...updatedFields } : r));
     try {
       await apiService.updateReminder(id, updatedFields);
+      setIsOnline(true);
     } catch (err) {
-      console.warn('Failed server update for reminder task:', err);
+      console.error('[API Update Reminder Error]', err);
+    }
+  };
+
+  const deleteReminder = async (id) => {
+    setReminders(prev => prev.filter(r => r.id !== id));
+    try {
+      await apiService.deleteReminder(id);
+      setIsOnline(true);
+    } catch (err) {
+      console.error('[API Delete Reminder Error]', err);
     }
   };
 
@@ -303,6 +343,7 @@ export function AppProvider({ children }) {
       deletePolicy,
       addReminder,
       updateReminder,
+      deleteReminder,
       toggleReminder
     }}>
       {children}

@@ -3,18 +3,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// User definition structure mapping helper
+// MongoDB Atlas High-Speed CRM User credentials document model definition
 export class User {
-  static createTableQuery() {
-    return `
-      CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        role TEXT DEFAULT 'Consultant',
-        displayName TEXT,
-        createdAt TEXT
-      );
-    `;
+  static getCollectionName() {
+    return 'users';
+  }
+
+  static getSchema() {
+    return {
+      id: { type: String, required: true, unique: true },
+      username: { type: String, required: true, unique: true },
+      password: { type: String, required: true },
+      role: { type: String, default: 'Consultant' },
+      displayName: { type: String },
+      createdAt: { type: String, required: true }
+    };
   }
 }
