@@ -11,6 +11,7 @@ export function reminderRoutes(db) {
   const controller = new ReminderController(db);
 
   router.get('/', controller.getAll);
+  router.post('/trigger-cron', controller.triggerCron);
   router.post('/', controller.create);
   router.put('/:id', controller.update);
   router.delete('/:id', controller.delete);

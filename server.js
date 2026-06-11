@@ -10,8 +10,16 @@ import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { MongoClient } from 'mongodb';
 import { documentRoutes } from './backend/routes/documentRoutes.js';
+import { sendSMSNotification } from './backend/utils/smsService.js';
+import { sendEmailReceipt } from './backend/utils/emailService.js';
 
 dotenv.config();
+
+// Additionally check backend/.env to load credentials
+const backendEnv = path.join(process.cwd(), 'backend', '.env');
+if (fs.existsSync(backendEnv)) {
+  dotenv.config({ path: backendEnv });
+}
 
 let mongoDbConnection = null;
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -234,10 +242,59 @@ async function startServer() {
 
   app.put('/api/candidates/:id', async (req, res) => {
     const { id } = req.params;
+    let oldCandidate = null;
+    const updateData = { ...req.body };
+    delete updateData._id;
+
     if (mongoDbConnection) {
       try {
-        const updateData = { ...req.body };
-        delete updateData._id;
+        oldCandidate = await mongoDbConnection.collection('candidates').findOne({ id });
+      } catch (err) {
+        console.error('[Backend Find Candidate error]', err);
+      }
+    } else {
+      oldCandidate = db.candidates.find((c) => c.id === id);
+    }
+
+    // Capture changes to trigger alerts
+    const scheduleChanged = updateData.appointmentDate && (!oldCandidate || oldCandidate.appointmentDate !== updateData.appointmentDate);
+    const codeGeneratedJustNow = updateData.exam?.agentCodeGenerated && (!oldCandidate || !oldCandidate.exam?.agentCodeGenerated);
+
+    // If schedule changed, trigger notification
+    if (scheduleChanged) {
+      const mobile = updateData.mobile;
+      const email = updateData.email;
+      if (mobile || email) {
+        const text = `Aynkaran Consultants: Dear candidate ${updateData.name}, your recruitment meeting has been confirmed / scheduled for ${updateData.appointmentDate}. Location: Aynkaran Head Office. We look forward to meeting you.`;
+        if (mobile) {
+          sendSMSNotification(mobile, text).catch(e => console.error('[Backend Candidate Rec SMS failed]', e));
+          sendSMSNotification(`whatsapp:${mobile}`, text).catch(e => console.error('[Backend Candidate Rec WA failed]', e));
+        }
+        if (email && email !== 'no-email@aynakaran.com') {
+          sendEmailReceipt(email, `Recruitment Meeting Scheduled - ${updateData.name}`, text).catch(e => console.error('[Backend Candidate Rec Email failed]', e));
+        }
+      }
+    }
+
+    // If code generated, trigger notification
+    if (codeGeneratedJustNow) {
+      const mobile = updateData.mobile;
+      const email = updateData.email;
+      const agentCode = updateData.exam?.agentCodeGenerated;
+      if (mobile || email) {
+        const text = `Aynkaran Consultants: Congratulations ${updateData.name}! Your IRDAI Agent Code has been generated successfully. Agent ID: ${agentCode}. You are requested to attend the compulsory One-day Induction Program at Aynkaran Consultants to activate your active insurance sales workspace.`;
+        if (mobile) {
+          sendSMSNotification(mobile, text).catch(e => console.error('[Backend Candidate Induction SMS failed]', e));
+          sendSMSNotification(`whatsapp:${mobile}`, text).catch(e => console.error('[Backend Candidate Induction WA failed]', e));
+        }
+        if (email && email !== 'no-email@aynakaran.com') {
+          sendEmailReceipt(email, `Agent License Generated - Induction Program Session`, text).catch(e => console.error('[Backend Candidate Induction Email failed]', e));
+        }
+      }
+    }
+
+    if (mongoDbConnection) {
+      try {
         await mongoDbConnection.collection('candidates').updateOne({ id }, { $set: updateData });
         res.json({ id, ...updateData });
       } catch (err) {
@@ -246,7 +303,7 @@ async function startServer() {
     } else {
       const index = db.candidates.findIndex((c) => c.id === id);
       if (index !== -1) {
-        db.candidates[index] = { ...db.candidates[index], ...req.body };
+        db.candidates[index] = { ...db.candidates[index], ...updateData };
         saveDatabase(db);
         res.json(db.candidates[index]);
       } else {
@@ -355,6 +412,146 @@ async function startServer() {
   });
 
   // --- REMINDER ENDPOINTS ---
+  app.post('/api/reminders/trigger-cron', async (req, res) => {
+    const now = new Date();
+    let newlyCreated = 0;
+
+    if (mongoDbConnection) {
+      try {
+        const { executeDailyPolicyRenewalJobs } = await import('./backend/cron/renewalJobs.js');
+        const { executeDailyReminderJobs } = await import('./backend/cron/reminderJobs.js');
+
+        const beforeCount = await mongoDbConnection.collection('reminders').countDocuments();
+
+        await executeDailyPolicyRenewalJobs(mongoDbConnection);
+        await executeDailyReminderJobs(mongoDbConnection);
+
+        const afterCount = await mongoDbConnection.collection('reminders').countDocuments();
+        newlyCreated = afterCount - beforeCount;
+
+        const list = await mongoDbConnection.collection('reminders').find().toArray();
+        res.json({
+          success: true,
+          message: 'Automated alerts engine executed successfully on MongoDB database!',
+          newRemindersCreated: newlyCreated,
+          reminders: list.map(r => ({ ...r, _id: undefined }))
+        });
+      } catch (err) {
+        console.error('[Trigger Cron Error]', err);
+        res.status(500).json({ error: err.message });
+      }
+    } else {
+      try {
+        const localDb = loadDatabase();
+        if (!localDb.reminders) localDb.reminders = [];
+
+        const initialCount = localDb.reminders.length;
+
+        // 1. Check policies
+        const upcomingRenewals = (localDb.policies || []).filter(policy =>
+          policy.renewalDate && policy.currentStage !== 'Policy Lapsed'
+        );
+
+        for (const policy of upcomingRenewals) {
+          const renewalDateObj = new Date(policy.renewalDate);
+          const renewalMidnight = Date.UTC(renewalDateObj.getFullYear(), renewalDateObj.getMonth(), renewalDateObj.getDate());
+          const nowMidnight = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+          const daysToRenewal = Math.round((renewalMidnight - nowMidnight) / (1000 * 3600 * 24));
+
+          if (daysToRenewal === 30 || daysToRenewal === 15 || (daysToRenewal > 0 && daysToRenewal <= 10)) {
+            const hasDuplicate = localDb.reminders.some(r => r.targetId === (policy.id || policy._id?.toString()) && r.triggerType === `${daysToRenewal} days before`);
+            if (!hasDuplicate) {
+              const remId = `rem-ren-${Date.now().toString().slice(-4)}`;
+              
+              // Resolve customer profile dynamically to pull registered mobile and email ID
+              const customer = (localDb.customers || []).find(c => 
+                c.id === policy.customerId || 
+                c.name === policy.customerName
+              );
+              
+              const targetMobile = customer ? (customer.mobileNumber || customer.mobile || '') : '';
+              const targetEmail = customer ? (customer.emailId || customer.email || '') : '';
+
+              localDb.reminders.unshift({
+                id: remId,
+                title: `Policy Renewal Reminder: ${policy.customerName}`,
+                description: `The premium for policy ${policy.policyType} (#${policy.issuedPolicyNumber}) is due in ${daysToRenewal} days. Amount: Rs. ${policy.premiumAmount}`,
+                dueDate: policy.renewalDate,
+                targetId: policy.id || policy._id?.toString(),
+                targetType: 'renewal',
+                triggerType: `${daysToRenewal} days before`,
+                completed: false,
+                channels: { desktop: true, whatsapp: !!targetMobile, email: !!targetEmail, sms: !!targetMobile },
+                customerMobile: targetMobile,
+                customerEmail: targetEmail,
+                createdAt: now.toISOString()
+              });
+
+              // Dispatch alerts automatically to customer destination
+              const subject = `LIC Policy Renewal Reminder - Policy #${policy.issuedPolicyNumber}`;
+              const message = `Aynkaran Consultants Urgent renewal: Dear customer ${policy.customerName}, your insurance policy ${policy.policyType} (#${policy.issuedPolicyNumber}) renewal premium Rs. ${policy.premiumAmount} is due in ${daysToRenewal} days on ${policy.renewalDate}. Please clear to maintain your active live coverage.`;
+
+              if (targetMobile) {
+                sendSMSNotification(targetMobile, message).catch(e => console.error('Local cron SMS failed:', e));
+              }
+              if (targetEmail) {
+                sendEmailReceipt(targetEmail, subject, message).catch(e => console.error('Local cron Email failed:', e));
+              }
+            }
+          }
+        }
+
+        // 2. Check candidates
+        const activeCandidates = (localDb.candidates || []).filter(cand =>
+          cand.currentStage !== 'Generate Agent Code' && cand.currentStage !== 'Meeting Appointment'
+        );
+
+        for (const cand of activeCandidates) {
+          if (!cand.pendingStageSince) continue;
+          const pendingSinceObj = new Date(cand.pendingStageSince);
+          const pendingMidnight = Date.UTC(pendingSinceObj.getFullYear(), pendingSinceObj.getMonth(), pendingSinceObj.getDate());
+          const nowMidnight = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+          const daysDiff = Math.round((nowMidnight - pendingMidnight) / (1000 * 3600 * 24));
+
+          if (daysDiff >= 4) {
+            const hasDuplicate = localDb.reminders.some(r => r.targetId === (cand.id || cand._id?.toString()) && r.triggerType === 'Immediate');
+            if (!hasDuplicate) {
+              const remId = `rem-auto-${Date.now().toString().slice(-4)}`;
+              localDb.reminders.unshift({
+                id: remId,
+                title: `Stuck Candidate Alert: ${cand.name}`,
+                description: `Trainee is stuck in step "${cand.currentStage}" for ${daysDiff} days. Immediate intervention required.`,
+                dueDate: new Date(now.getTime() + (2 * 24 * 3600 * 1000)).toISOString().split('T')[0],
+                targetId: cand.id || cand._id?.toString(),
+                targetType: 'recruitment',
+                triggerType: 'Immediate',
+                completed: false,
+                channels: { desktop: true, whatsapp: true, email: false },
+                createdAt: now.toISOString()
+              });
+            }
+          }
+        }
+
+        newlyCreated = localDb.reminders.length - initialCount;
+
+        // Update in-memory fallback & save
+        db.reminders = localDb.reminders;
+        saveDatabase(db);
+
+        res.json({
+          success: true,
+          message: 'Automated alerts engine executed successfully on local database!',
+          newRemindersCreated: newlyCreated,
+          reminders: db.reminders
+        });
+      } catch (err) {
+        console.error('[Trigger Cron Error]', err);
+        res.status(500).json({ error: err.message });
+      }
+    }
+  });
+
   app.get('/api/reminders', async (req, res) => {
     if (mongoDbConnection) {
       try {
@@ -374,6 +571,28 @@ async function startServer() {
       id: req.body.id || `rem-${Date.now().toString().slice(-5)}`,
       createdAt: req.body.createdAt || new Date().toISOString(),
     };
+
+    // Auto Dispatch Automated SMS, WhatsApp, and Email instantly on backend
+    if (newReminder.customerMobile || newReminder.customerEmail) {
+      const mobile = newReminder.customerMobile;
+      const email = newReminder.customerEmail;
+      const title = newReminder.title || 'Aynkaran Notification';
+      const desc = newReminder.description || '';
+      const text = `${title} - ${desc}`;
+
+      if (mobile) {
+        // 1. Cellular SMS
+        sendSMSNotification(mobile, text).catch(e => console.error('[Backend SMS error]', e));
+        // 2. WhatsApp Simulation (Prefix with whatsapp:)
+        sendSMSNotification(`whatsapp:${mobile}`, text).catch(e => console.error('[Backend WhatsApp error]', e));
+      }
+
+      if (email && email !== 'no-email@aynakaran.com' && email !== 'no-email@aynakaran.com') {
+        // 3. Corporate Email via Secure TLS SMTP or Sandbox Interceptor Routing
+        sendEmailReceipt(email, title, text).catch(e => console.error('[Backend Email error]', e));
+      }
+    }
+
     if (mongoDbConnection) {
       try {
         await mongoDbConnection.collection('reminders').insertOne({ ...newReminder });

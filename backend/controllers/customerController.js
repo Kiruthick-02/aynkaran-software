@@ -17,6 +17,7 @@ export class CustomerController {
         id: r.id || r._id.toString(),
         _id: undefined,
         kycDocuments: typeof r.kycDocuments === 'string' ? JSON.parse(r.kycDocuments || '{}') : (r.kycDocuments || {}),
+        kycUploadDates: typeof r.kycUploadDates === 'string' ? JSON.parse(r.kycUploadDates || '{}') : (r.kycUploadDates || {}),
         nominee: typeof r.nominee === 'string' ? JSON.parse(r.nominee || '{}') : (r.nominee || {}),
         work: typeof r.work === 'string' ? JSON.parse(r.work || '{}') : (r.work || {}),
       }));

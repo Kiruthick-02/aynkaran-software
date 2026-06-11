@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { sendSMSNotification } from '../utils/smsService.js';
+import { sendEmailReceipt } from '../utils/emailService.js';
+
 // Controller matching high density recruited/candidate files using MongoDB Atlas
 export class RecruitmentController {
   constructor(db) {
@@ -54,6 +57,50 @@ export class RecruitmentController {
       const { id } = req.params;
       const data = { ...req.body };
       delete data._id; // _id must be immutable
+
+      let oldCandidate = null;
+      try {
+        oldCandidate = await this.db.collection('candidates').findOne({ id });
+      } catch (err) {
+        console.error('[Backend Find Candidate error]', err);
+      }
+
+      // Capture changes to trigger alerts
+      const scheduleChanged = data.appointmentDate && (!oldCandidate || oldCandidate.appointmentDate !== data.appointmentDate);
+      const codeGeneratedJustNow = data.exam?.agentCodeGenerated && (!oldCandidate || !oldCandidate.exam?.agentCodeGenerated);
+
+      // If schedule changed, trigger notification
+      if (scheduleChanged) {
+        const mobile = data.mobile;
+        const email = data.email;
+        if (mobile || email) {
+          const text = `Aynkaran Consultants: Dear candidate ${data.name}, your recruitment meeting has been confirmed / scheduled for ${data.appointmentDate}. Location: Aynkaran Head Office. We look forward to meeting you.`;
+          if (mobile) {
+            sendSMSNotification(mobile, text).catch(e => console.error('[Backend Candidate Rec SMS failed]', e));
+            sendSMSNotification(`whatsapp:${mobile}`, text).catch(e => console.error('[Backend Candidate Rec WA failed]', e));
+          }
+          if (email && email !== 'no-email@aynakaran.com') {
+            sendEmailReceipt(email, `Recruitment Meeting Scheduled - ${data.name}`, text).catch(e => console.error('[Backend Candidate Rec Email failed]', e));
+          }
+        }
+      }
+
+      // If code generated, trigger notification
+      if (codeGeneratedJustNow) {
+        const mobile = data.mobile;
+        const email = data.email;
+        const agentCode = data.exam?.agentCodeGenerated;
+        if (mobile || email) {
+          const text = `Aynkaran Consultants: Congratulations ${data.name}! Your IRDAI Agent Code has been generated successfully. Agent ID: ${agentCode}. You are requested to attend the compulsory One-day Induction Program at Aynkaran Consultants to activate your active insurance sales workspace.`;
+          if (mobile) {
+            sendSMSNotification(mobile, text).catch(e => console.error('[Backend Candidate Induction SMS failed]', e));
+            sendSMSNotification(`whatsapp:${mobile}`, text).catch(e => console.error('[Backend Candidate Induction WA failed]', e));
+          }
+          if (email && email !== 'no-email@aynakaran.com') {
+            sendEmailReceipt(email, `Agent License Generated - Induction Program Session`, text).catch(e => console.error('[Backend Candidate Induction Email failed]', e));
+          }
+        }
+      }
 
       await this.db.collection('candidates').updateOne({ id }, { $set: data });
       res.json({ id, ...data });

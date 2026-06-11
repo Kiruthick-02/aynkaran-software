@@ -16,8 +16,8 @@ import { createExpressApp } from './app.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Railway automatically provides PORT
-const PORT = process.env.PORT || 8080;
+// Hardcoded to run only on port 5000 as requested
+const PORT = 5000;
 
 async function run() {
   try {
