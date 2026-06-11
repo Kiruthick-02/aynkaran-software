@@ -13,10 +13,11 @@ import {
   Trash2,
 } from 'lucide-react';
 
-export default function Reminders({ reminders = [], addReminder, updateReminder, deleteReminder }) {
+export default function Reminders({ reminders = [], addReminder, updateReminder, deleteReminder, triggerAutomatedReminders }) {
   const [filterType, setFilterType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [successToast, setSuccessToast] = useState(null);
+
 
   const handleBroadcastSimulation = (reminder, channel) => {
     let destination = '';
@@ -72,7 +73,7 @@ export default function Reminders({ reminders = [], addReminder, updateReminder,
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-900 font-sans">Module 4: Automated Reminders & Broadcasting Console</h2>
           <p className="text-xs text-slate-500 font-medium">
-            Monitor trigger schedules ({`30 days before, 7 days before, 1 day before, Due date`}) and dispatch announcements to clients & agents.
+            Monitor trigger schedules (1 month, 3 weeks, 2 weeks, 1 week, 3 days, and 1 day before) and dispatch announcements to clients & agents.
           </p>
         </div>
         {reminders.some((r) => r.completed) && (
@@ -84,6 +85,7 @@ export default function Reminders({ reminders = [], addReminder, updateReminder,
           </button>
         )}
       </div>
+      
 
       {successToast && (
         <div className="bg-emerald-600 text-white p-4 rounded-xl shadow-lg border border-emerald-500 flex items-center space-x-3 text-xs animate-bounce">
@@ -178,6 +180,17 @@ export default function Reminders({ reminders = [], addReminder, updateReminder,
                       </span>
                     </div>
                     <p className="text-xs text-slate-600 mt-1">{reminder.description}</p>
+                    
+                    {(reminder.customerMobile || reminder.customerEmail) && (
+                      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] font-mono text-indigo-600 mt-1 px-2.5 py-1 rounded-lg w-fit border border-indigo-100/60 bg-indigo-50/50">
+                        {reminder.customerMobile && <span>📞 Contact Mobile: <strong className="text-slate-800">{reminder.customerMobile}</strong></span>}
+                        {reminder.customerMobile && reminder.customerEmail && <span className="text-indigo-300">|</span>}
+                        {reminder.customerEmail && <span>✉️ Email ID: <strong className="text-slate-800">{reminder.customerEmail}</strong></span>}
+                      </div>
+                    )}
+
+
+
                     <div className="flex items-center space-x-2.5 text-[10px] font-mono text-slate-400 mt-2">
                       <span>Schedule: {reminder.dueDate}</span>
                       <span>•</span>

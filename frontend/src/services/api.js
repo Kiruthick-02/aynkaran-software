@@ -79,6 +79,9 @@ export const apiService = {
 
   // --- TRIGGER REMINDERS CONSOLE ---
   getReminders: () => request('/reminders'),
+  triggerCronScan: () => request('/reminders/trigger-cron', {
+    method: 'POST'
+  }),
   createReminder: (reminder) => request('/reminders', {
     method: 'POST',
     body: JSON.stringify(reminder)

@@ -88,8 +88,15 @@ const getFileUrl = (url) => {
   return `${API_URL || ''}${url}`;
 };
 
+const cleanFileName = (filePathOrName) => {
+  if (!filePathOrName) return '';
+  const baseName = filePathOrName.includes('/') ? filePathOrName.substring(filePathOrName.lastIndexOf('/') + 1) : filePathOrName;
+  // Strip out leading numbers followed by hyphen or underscore (such as standard Multer timestamps Date.now())
+  return baseName.replace(/^\d+[-_]/, '');
+};
+
 export default function Customers({ customers = [], addCustomer, updateCustomer, deleteCustomer, policies = [] }) {
-  const { loadStateFromServer } = useApp();
+  const { loadStateFromServer, candidates } = useApp();
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
@@ -102,6 +109,7 @@ export default function Customers({ customers = [], addCustomer, updateCustomer,
   const [emailId, setEmailId] = useState('');
   const [address, setAddress] = useState('');
   const [spouseName, setSpouseName] = useState('');
+  const [agentCodeField, setAgentCodeField] = useState('');
 
   const [incomeProof, setIncomeProof] = useState('');
   const [educationCertificate, setEducationCertificate] = useState('');
@@ -125,6 +133,11 @@ export default function Customers({ customers = [], addCustomer, updateCustomer,
   const [occupation, setOccupation] = useState('');
 
   const [docFileVal, setDocFileVal] = useState('');
+  const [isEditingCustDetails, setIsEditingCustDetails] = useState(false);
+  const [editCustName, setEditCustName] = useState('');
+  const [editCustMobile, setEditCustMobile] = useState('');
+  const [editCustEmail, setEditCustEmail] = useState('');
+  const [editCustDob, setEditCustDob] = useState('');
   const [isAadhaarDragging, setIsAadhaarDragging] = useState(false);
   const [isPhotoDragging, setIsPhotoDragging] = useState(false);
 
@@ -199,7 +212,16 @@ export default function Customers({ customers = [], addCustomer, updateCustomer,
     const cust = customers.find((c) => c.id === selectedCustomerId);
     if (cust) {
       const updatedKyc = { ...cust.kycDocuments, [category]: dataUrl || undefined };
-      updateCustomer(selectedCustomerId, { kycDocuments: updatedKyc });
+      const updatedDates = { ...cust.kycUploadDates };
+      if (dataUrl) {
+        updatedDates[category] = new Date().toISOString().split('T')[0];
+      } else {
+        delete updatedDates[category];
+      }
+      updateCustomer(selectedCustomerId, { 
+        kycDocuments: updatedKyc, 
+        kycUploadDates: updatedDates 
+      });
     }
   };
 
@@ -242,6 +264,7 @@ export default function Customers({ customers = [], addCustomer, updateCustomer,
       emailId,
       address,
       spouseName,
+      agentCode: agentCodeField,
       kycDocuments: {
         passportSizePhoto: finalPhoto.startsWith('data:') ? undefined : finalPhoto
       },
@@ -304,6 +327,7 @@ export default function Customers({ customers = [], addCustomer, updateCustomer,
     setNomineeRelationship('');
     setAnnualIncome('');
     setOccupation('');
+    setAgentCodeField('');
   };
 
   const handleAddKYCDocument = (category) => {
@@ -313,7 +337,12 @@ export default function Customers({ customers = [], addCustomer, updateCustomer,
     if (cust) {
       const updatedKyc = { ...cust.kycDocuments };
       updatedKyc[category] = docFileVal;
-      updateCustomer(selectedCustomerId, { kycDocuments: updatedKyc });
+      const updatedDates = { ...cust.kycUploadDates };
+      updatedDates[category] = new Date().toISOString().split('T')[0];
+      updateCustomer(selectedCustomerId, { 
+        kycDocuments: updatedKyc, 
+        kycUploadDates: updatedDates 
+      });
     }
 
     setDocFileVal('');
@@ -437,19 +466,101 @@ export default function Customers({ customers = [], addCustomer, updateCustomer,
                     </span>
                   </div>
 
-                  <div className="flex-1 space-y-1">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
-                      <h3 className="font-extrabold text-lg text-slate-900 leading-tight">{activeCustomer.name}</h3>
-                      <span className="w-fit inline-block font-mono text-[9px] bg-slate-100 border border-slate-200 text-slate-800 px-2 py-0.5 mt-1 sm:mt-0 rounded font-semibold">
+                  {isEditingCustDetails ? (
+                    <div className="flex-1 bg-slate-50 p-3.5 border border-slate-200 rounded-xl space-y-3">
+                      <h4 className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">Update Customer Profile Info</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Full Name</label>
+                          <input
+                            type="text"
+                            value={editCustName}
+                            onChange={(e) => setEditCustName(e.target.value)}
+                            className="w-full bg-white border border-slate-300 rounded p-1 text-xs text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Mobile Number</label>
+                          <input
+                            type="tel"
+                            value={editCustMobile}
+                            onChange={(e) => setEditCustMobile(e.target.value)}
+                            className="w-full bg-white border border-slate-300 rounded p-1 text-xs text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">DOB Date</label>
+                          <input
+                            type="date"
+                            value={editCustDob}
+                            onChange={(e) => setEditCustDob(e.target.value)}
+                            className="w-full bg-white border border-slate-300 rounded p-1 text-xs text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Email ID Address</label>
+                          <input
+                            type="email"
+                            value={editCustEmail}
+                            onChange={(e) => setEditCustEmail(e.target.value)}
+                            className="w-full bg-white border border-slate-300 rounded p-1 text-xs text-slate-800"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end space-x-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingCustDetails(false)}
+                          className="px-2.5 py-1 text-[11px] bg-slate-100 font-semibold rounded text-slate-600 hover:bg-slate-200 cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!editCustName || !editCustMobile) return;
+                            await updateCustomer(activeCustomer.id, {
+                              name: editCustName,
+                              mobileNumber: editCustMobile,
+                              dob: editCustDob,
+                              emailId: editCustEmail,
+                            });
+                            setIsEditingCustDetails(false);
+                          }}
+                          className="px-2.5 py-1 text-[11px] bg-indigo-600 font-extrabold rounded text-white hover:bg-indigo-700 cursor-pointer"
+                        >
+                          Save Profile
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 space-y-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2.5">
+                        <h3 className="font-extrabold text-lg text-slate-900 leading-tight">{activeCustomer.name}</h3>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditCustName(activeCustomer.name || '');
+                            setEditCustMobile(activeCustomer.mobileNumber || '');
+                            setEditCustDob(activeCustomer.dob || '');
+                            setEditCustEmail(activeCustomer.emailId || '');
+                            setIsEditingCustDetails(true);
+                          }}
+                          className="px-2 py-0.5 text-[9.5px] bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded font-bold transition-all shadow-2xs cursor-pointer"
+                        >
+                          Edit Profile
+                        </button>
+                      </div>
+                      <p className="w-fit inline-block font-mono text-[9px] bg-slate-100 border border-slate-200 text-slate-800 px-2 py-0.5 rounded font-semibold mt-1">
                         ID: {activeCustomer.id}
-                      </span>
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-500 mt-2">
+                        <p>DOB: <strong>{activeCustomer.dob}</strong></p>
+                        <p>Mobile: <strong>{activeCustomer.mobileNumber}</strong></p>
+                        <p>Email: <strong>{activeCustomer.emailId || activeCustomer.email || 'N/A'}</strong></p>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-500 mt-2">
-                      <p>DOB: <strong>{activeCustomer.dob}</strong></p>
-                      <p>Mobile: <strong>{activeCustomer.mobileNumber}</strong></p>
-                      <p>Email: <strong>{activeCustomer.emailId}</strong></p>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="border-t border-slate-100 mt-5 pt-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs text-slate-600">
@@ -472,6 +583,41 @@ export default function Customers({ customers = [], addCustomer, updateCustomer,
                   <p className="text-slate-800 font-medium leading-relaxed bg-slate-50 border border-slate-100 rounded-xl p-3">
                     {activeCustomer.address}
                   </p>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-100 text-xs">
+                  <span className="block text-[10px] text-slate-400 font-bold uppercase mb-1.5">Assigned Agent Coordinator of Record</span>
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 leading-snug">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 block uppercase">Assigned Agent ID Code</span>
+                      <p className="font-extrabold text-slate-800 text-xs mt-0.5">
+                        {activeCustomer.agentCode ? (
+                          <span className="font-mono text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
+                            {activeCustomer.agentCode}
+                          </span>
+                        ) : 'No Agent Linked (Direct Office Customer)'}
+                      </p>
+                    </div>
+                    <div>
+                      <select
+                        value={activeCustomer.agentCode || ''}
+                        onChange={(e) => {
+                          console.log('[DEBUG] Assigning customer', activeCustomer.id, 'to agentCode', e.target.value);
+                          updateCustomer(activeCustomer.id, { agentCode: e.target.value });
+                        }}
+                        className="bg-white border border-slate-350 rounded-lg px-2.5 py-1.5 text-slate-705 text-xs focus:ring-1 focus:ring-indigo-500 font-medium"
+                      >
+                        <option value="">-- Direct Sale (No Agent) --</option>
+                        {(candidates || [])
+                          .filter(c => c.exam?.agentCodeGenerated)
+                          .map(c => (
+                            <option key={c.id} value={c.exam.agentCodeGenerated}>
+                              {c.name} ({c.exam.agentCodeGenerated})
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -560,13 +706,13 @@ export default function Customers({ customers = [], addCustomer, updateCustomer,
                               className="text-[10px] text-emerald-800 font-extrabold truncate max-w-[110px] hover:underline cursor-pointer flex items-center space-x-1"
                               onClick={() => {
                                 setPreviewDocUrl(value);
-                                setPreviewDocName(slot.key === 'passportSizePhoto' ? 'Photo.png' : value.startsWith('data:') ? 'Attachment.pdf' : value.substring(value.lastIndexOf('/') + 1));
+                                setPreviewDocName(slot.key === 'passportSizePhoto' ? 'Photo.png' : value.startsWith('data:') ? 'Attachment.pdf' : cleanFileName(value));
                                 setPreviewDocCategory(slot.label);
                               }}
                               title="Click to preview document inline"
                             >
                               <Eye size={10} className="inline mr-0.5 text-emerald-600" />
-                              <span>{value.startsWith('data:') ? (slot.key === 'passportSizePhoto' ? 'Photo.png' : 'Attachment.pdf') : value.substring(value.lastIndexOf('/') + 1)}</span>
+                              <span>{value.startsWith('data:') ? (slot.key === 'passportSizePhoto' ? 'Photo.png' : 'Attachment.pdf') : cleanFileName(value)}</span>
                             </span>
                             <div className="flex items-center space-x-1">
                               <span className="text-[8px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-extrabold">Verified</span>
@@ -697,6 +843,25 @@ export default function Customers({ customers = [], addCustomer, updateCustomer,
                       className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-slate-800"
                     />
                   </div>
+                </div>
+
+                <div className="mt-3">
+                  <label className="block font-bold text-slate-700 mb-1">Assigned Agent (Advisor Code)</label>
+                  <select
+                    value={agentCodeField}
+                    onChange={(e) => setAgentCodeField(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-slate-800 text-xs"
+                  >
+                    <option value="">-- No Agent / Direct Sale --</option>
+                    {(candidates || [])
+                      .filter(c => c.exam?.agentCodeGenerated)
+                      .map(c => (
+                        <option key={c.id} value={c.exam.agentCodeGenerated}>
+                          {c.name} ({c.exam.agentCodeGenerated})
+                        </option>
+                      ))}
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1">Select the recruiter/advisor who introduced this customer profile.</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">

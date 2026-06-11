@@ -75,27 +75,56 @@ export function AppProvider({ children }) {
         apiService.getReminders()
       ]);
 
-      if (Array.isArray(custs)) {
-        // Sort by createdAt desc
-        custs.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-        setCustomers(custs);
+      // Safely load caches
+      const cachedCusts = JSON.parse(localStorage.getItem('ayn_customers') || '[]');
+      const cachedCands = JSON.parse(localStorage.getItem('ayn_candidates') || '[]');
+      const cachedPols = JSON.parse(localStorage.getItem('ayn_policies') || '[]');
+      const cachedRems = JSON.parse(localStorage.getItem('ayn_reminders') || '[]');
+
+      let resolvedCusts = Array.isArray(custs) ? custs : [];
+      let resolvedCands = Array.isArray(cands) ? cands : [];
+      let resolvedPols = Array.isArray(pols) ? pols : [];
+      let resolvedRems = Array.isArray(rems) ? rems : [];
+
+      // If server is active but has completely empty data structures while client holds offline cache, push payload to serve as database truth
+      if (
+        (resolvedCusts.length === 0 && cachedCusts.length > 0) ||
+        (resolvedPols.length === 0 && cachedPols.length > 0) ||
+        (resolvedCands.length === 0 && cachedCands.length > 0)
+      ) {
+        console.log('[System Sync] Server database appears default or unpopulated. Synchronizing local cache records into database backend...');
+        const payload = {
+          customers: resolvedCusts.length > 0 ? resolvedCusts : cachedCusts,
+          candidates: resolvedCands.length > 0 ? resolvedCands : cachedCands,
+          policies: resolvedPols.length > 0 ? resolvedPols : cachedPols,
+          reminders: resolvedRems.length > 0 ? resolvedRems : cachedRems,
+        };
+        try {
+          await apiService.syncDatabase(payload);
+          resolvedCusts = payload.customers;
+          resolvedCands = payload.candidates;
+          resolvedPols = payload.policies;
+          resolvedRems = payload.reminders;
+        } catch (syncErr) {
+          console.error('[System Sync] Bulk push to empty database failed:', syncErr);
+        }
       }
-      if (Array.isArray(cands)) {
-        cands.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-        setCandidates(cands);
-      }
-      if (Array.isArray(pols)) {
-        pols.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-        setPolicies(pols);
-      }
-      if (Array.isArray(rems)) {
-        rems.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-        setReminders(rems);
-      }
+
+      resolvedCusts.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      setCustomers(resolvedCusts);
+
+      resolvedCands.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      setCandidates(resolvedCands);
+
+      resolvedPols.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      setPolicies(resolvedPols);
+
+      resolvedRems.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      setReminders(resolvedRems);
 
       setIsOnline(true);
       setIsServerLoaded(true);
-      console.log('[System] State loaded successfully from MongoDB database.');
+      console.log('[System] State synchronized successfully with backend database.');
     } catch (error) {
       console.warn('[Sync Error] Failed to stream from back-end REST API, utilizing local cache:', error);
       setIsOnline(false);
@@ -252,6 +281,7 @@ export function AppProvider({ children }) {
     try {
       await apiService.updatePolicy(id, updatedFields);
       setIsOnline(true);
+      loadStateFromServer();
     } catch (err) {
       console.error('[API Update Policy Error]', err);
     }
@@ -313,6 +343,19 @@ export function AppProvider({ children }) {
     }
   };
 
+  const triggerAutomatedReminders = async () => {
+    try {
+      const res = await apiService.triggerCronScan();
+      if (res && res.reminders) {
+        setReminders(res.reminders);
+      }
+      setIsOnline(true);
+      return res;
+    } catch (err) {
+      console.error('[API Trigger Automated Reminders Error]', err);
+    }
+  };
+
   return (
     <AppContext.Provider value={{
       isAuthenticated,
@@ -344,7 +387,8 @@ export function AppProvider({ children }) {
       addReminder,
       updateReminder,
       deleteReminder,
-      toggleReminder
+      toggleReminder,
+      triggerAutomatedReminders
     }}>
       {children}
     </AppContext.Provider>

@@ -7,7 +7,8 @@ export default function RemindersPage() {
     reminders,
     addReminder,
     updateReminder,
-    deleteReminder
+    deleteReminder,
+    triggerAutomatedReminders
   } = useApp();
 
   return (
@@ -16,6 +17,7 @@ export default function RemindersPage() {
       addReminder={addReminder}
       updateReminder={updateReminder}
       deleteReminder={deleteReminder}
+      triggerAutomatedReminders={triggerAutomatedReminders}
     />
   );
 }

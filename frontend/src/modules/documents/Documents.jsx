@@ -21,17 +21,21 @@ const getFileUrl = (url) => {
   return `${API_URL || ''}${url}`;
 };
 
+const cleanFileName = (filePathOrName) => {
+  if (!filePathOrName) return '';
+  const baseName = filePathOrName.includes('/') ? filePathOrName.substring(filePathOrName.lastIndexOf('/') + 1) : filePathOrName;
+  // Strip out leading numbers followed by hyphen or underscore (such as standard Multer timestamps Date.now())
+  return baseName.replace(/^\d+[-_]/, '');
+};
+
 export default function Documents({ candidates = [], customers = [] }) {
   const { updateCandidate, updateCustomer } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedVaultOwner, setSelectedVaultOwner] = useState(null);
   const [previewDoc, setPreviewDoc] = useState(null);
 
-  const [corporateDocs, setCorporateDocs] = useState([
-    { id: 'corp-101', name: 'IRDAI licensing regulations guide 2026.pdf', category: 'Corporate Policy', sourceName: 'Aynkaran Admin', sourceType: 'Corporate', uploadedAt: '2026-04-10' },
-    { id: 'corp-102', name: 'Aynkaran Life - Individual Savings & Pension agent manual.pdf', category: 'Sales Material', sourceName: 'Aynkaran Life', sourceType: 'Corporate', uploadedAt: '2026-05-02' },
-    { id: 'corp-103', name: 'Aynkaran client onboarding checklist.pdf', category: 'Onboarding Checklist', sourceName: 'Aynkaran Admin', sourceType: 'Corporate', uploadedAt: '2026-05-15' },
-  ]);
+  const [corporateDocs, setCorporateDocs] = useState([]);
 
   const [newCorpName, setNewCorpName] = useState('');
   const [newCorpCat, setNewCorpCat] = useState('Corporate Policy');
@@ -51,7 +55,9 @@ export default function Documents({ candidates = [], customers = [] }) {
     if (cust) {
       const updatedKyc = { ...cust.kycDocuments };
       delete updatedKyc[key];
-      updateCustomer(customerId, { kycDocuments: updatedKyc });
+      const updatedDates = { ...cust.kycUploadDates };
+      delete updatedDates[key];
+      updateCustomer(customerId, { kycDocuments: updatedKyc, kycUploadDates: updatedDates });
     }
   };
 
@@ -59,41 +65,61 @@ export default function Documents({ candidates = [], customers = [] }) {
     (c.documents || []).map((doc) => ({
       id: doc.id,
       candidateId: c.id,
-      name: doc.name,
+      name: cleanFileName(doc.name),
       category: doc.category,
       sourceName: c.name,
       sourceType: 'Candidate',
-      uploadedAt: doc.uploadedAt,
+      uploadedAt: doc.uploadedAt?.split('T')[0] || new Date().toISOString().split('T')[0],
       url: doc.url,
     }))
   );
 
   const customerDocs = customers.flatMap((cust) => {
     const list = [];
+    const getUploadDate = (key) => {
+      if (cust.kycUploadDates && cust.kycUploadDates[key]) {
+        return cust.kycUploadDates[key];
+      }
+      if (cust.createdAt) {
+        return cust.createdAt.split('T')[0];
+      }
+      return new Date().toISOString().split('T')[0];
+    };
+
+    if (cust.kycDocuments?.passportSizePhoto) {
+      const fullUrl = cust.kycDocuments.passportSizePhoto;
+      const fileName = fullUrl.startsWith('data:') ? 'Passport_Size_Photo.png' : cleanFileName(fullUrl);
+      list.push({ id: `${cust.id}-photo`, key: 'passportSizePhoto', customerId: cust.id, name: fileName, category: 'Passport Size Photo', sourceName: cust.name, sourceType: 'Customer', uploadedAt: getUploadDate('passportSizePhoto'), url: fullUrl });
+    }
     if (cust.kycDocuments?.aadhaarCard) {
       const fullUrl = cust.kycDocuments.aadhaarCard;
-      const fileName = fullUrl.startsWith('data:') ? 'Aadhaar_Document.png' : fullUrl.substring(fullUrl.lastIndexOf('/') + 1);
-      list.push({ id: `${cust.id}-aadhaar`, key: 'aadhaarCard', customerId: cust.id, name: fileName, category: 'Aadhaar Card', sourceName: cust.name, sourceType: 'Customer', uploadedAt: '2025-05-10', url: fullUrl });
+      const fileName = fullUrl.startsWith('data:') ? 'Aadhaar_Document.png' : cleanFileName(fullUrl);
+      list.push({ id: `${cust.id}-aadhaar`, key: 'aadhaarCard', customerId: cust.id, name: fileName, category: 'Aadhaar Card', sourceName: cust.name, sourceType: 'Customer', uploadedAt: getUploadDate('aadhaarCard'), url: fullUrl });
     }
     if (cust.kycDocuments?.panCard) {
       const fullUrl = cust.kycDocuments.panCard;
-      const fileName = fullUrl.startsWith('data:') ? 'PAN_Document.png' : fullUrl.substring(fullUrl.lastIndexOf('/') + 1);
-      list.push({ id: `${cust.id}-pan`, key: 'panCard', customerId: cust.id, name: fileName, category: 'PAN Card', sourceName: cust.name, sourceType: 'Customer', uploadedAt: '2025-05-10', url: fullUrl });
+      const fileName = fullUrl.startsWith('data:') ? 'PAN_Document.png' : cleanFileName(fullUrl);
+      list.push({ id: `${cust.id}-pan`, key: 'panCard', customerId: cust.id, name: fileName, category: 'PAN Card', sourceName: cust.name, sourceType: 'Customer', uploadedAt: getUploadDate('panCard'), url: fullUrl });
     }
     if (cust.kycDocuments?.incomeProof) {
       const fullUrl = cust.kycDocuments.incomeProof;
-      const fileName = fullUrl.startsWith('data:') ? 'Income_Proof.png' : fullUrl.substring(fullUrl.lastIndexOf('/') + 1);
-      list.push({ id: `${cust.id}-income`, key: 'incomeProof', customerId: cust.id, name: fileName, category: 'Income Proof', sourceName: cust.name, sourceType: 'Customer', uploadedAt: '2025-05-12', url: fullUrl });
+      const fileName = fullUrl.startsWith('data:') ? 'Income_Proof.png' : cleanFileName(fullUrl);
+      list.push({ id: `${cust.id}-income`, key: 'incomeProof', customerId: cust.id, name: fileName, category: 'Income Proof', sourceName: cust.name, sourceType: 'Customer', uploadedAt: getUploadDate('incomeProof'), url: fullUrl });
     }
     if (cust.kycDocuments?.educationCertificate) {
       const fullUrl = cust.kycDocuments.educationCertificate;
-      const fileName = fullUrl.startsWith('data:') ? 'Education_Certificate.png' : fullUrl.substring(fullUrl.lastIndexOf('/') + 1);
-      list.push({ id: `${cust.id}-edu`, key: 'educationCertificate', customerId: cust.id, name: fileName, category: 'Education Certificate', sourceName: cust.name, sourceType: 'Customer', uploadedAt: '2025-05-12', url: fullUrl });
+      const fileName = fullUrl.startsWith('data:') ? 'Education_Certificate.png' : cleanFileName(fullUrl);
+      list.push({ id: `${cust.id}-edu`, key: 'educationCertificate', customerId: cust.id, name: fileName, category: 'Education Certificate', sourceName: cust.name, sourceType: 'Customer', uploadedAt: getUploadDate('educationCertificate'), url: fullUrl });
+    }
+    if (cust.kycDocuments?.signatureCopy) {
+      const fullUrl = cust.kycDocuments.signatureCopy;
+      const fileName = fullUrl.startsWith('data:') ? 'Signature_Specimen.png' : cleanFileName(fullUrl);
+      list.push({ id: `${cust.id}-signature`, key: 'signatureCopy', customerId: cust.id, name: fileName, category: 'Signature Specimen Scan', sourceName: cust.name, sourceType: 'Customer', uploadedAt: getUploadDate('signatureCopy'), url: fullUrl });
     }
     if (cust.kycDocuments?.passport) {
       const fullUrl = cust.kycDocuments.passport;
-      const fileName = fullUrl.startsWith('data:') ? 'Indian_Passport.png' : fullUrl.substring(fullUrl.lastIndexOf('/') + 1);
-      list.push({ id: `${cust.id}-passport`, key: 'passport', customerId: cust.id, name: fileName, category: 'Indian Passport Copy', sourceName: cust.name, sourceType: 'Customer', uploadedAt: '2025-05-12', url: fullUrl });
+      const fileName = fullUrl.startsWith('data:') ? 'Indian_Passport.png' : cleanFileName(fullUrl);
+      list.push({ id: `${cust.id}-passport`, key: 'passport', customerId: cust.id, name: fileName, category: 'Indian Passport Copy', sourceName: cust.name, sourceType: 'Customer', uploadedAt: getUploadDate('passport'), url: fullUrl });
     }
     return list;
   });
@@ -102,9 +128,33 @@ export default function Documents({ candidates = [], customers = [] }) {
 
   const filtered = fullDocumentsPool.filter((doc) => {
     const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase()) || doc.sourceName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || doc.category.toLowerCase().includes(selectedCategory.toLowerCase()) || doc.sourceType.toLowerCase() === selectedCategory.toLowerCase();
-    return matchesSearch && matchesCategory;
+    let matchesCategory = false;
+    if (selectedCategory === 'all') {
+      matchesCategory = true;
+    } else if (selectedCategory.toLowerCase() === 'customer' || selectedCategory.toLowerCase() === 'candidate') {
+      matchesCategory = doc.sourceType.toLowerCase() === selectedCategory.toLowerCase();
+    } else {
+      const docCatLower = doc.category.toLowerCase();
+      const selCatLower = selectedCategory.toLowerCase();
+      if (selCatLower === 'passport') {
+        matchesCategory = docCatLower.includes('indian passport');
+      } else if (selCatLower === 'photo') {
+        matchesCategory = docCatLower.includes('passport size photo') || docCatLower === 'photo';
+      } else {
+        matchesCategory = docCatLower.includes(selCatLower);
+      }
+    }
+    const matchesOwner = !selectedVaultOwner || (doc.sourceType === 'Candidate' ? doc.candidateId === selectedVaultOwner : doc.customerId === selectedVaultOwner);
+    return matchesSearch && matchesCategory && matchesOwner;
   });
+
+  const owners = [
+      ...candidates.map(c => ({ id: c.id, name: c.name, type: 'Agent', photo: c.profilePicture })),
+      ...customers.map(c => ({ id: c.id, name: c.name, type: 'Customer', photo: c.kycDocuments?.passportSizePhoto }))
+    ];
+
+  const customerOwners = owners.filter(o => o.type === 'Customer');
+  const agentOwners = owners.filter(o => o.type === 'Agent');
 
   const handleUploadCorpDoc = (e) => {
     e.preventDefault();
@@ -131,38 +181,123 @@ export default function Documents({ candidates = [], customers = [] }) {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-slate-900 font-sans">Module 6: Secure Corporate Document Vault</h2>
+          <h2 className="text-xl font-bold tracking-tight text-slate-900 font-sans">Module 6: Secure Document Vault</h2>
           <p className="text-xs text-slate-500 font-medium">
-            Central repository scanning recruitment forms, client KYC documents, and agency manuals safely.
+            Central repository inspecting candidate training forms, client KYC documents, and agency templates safely.
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
+      <div className="space-y-4">
+        {/* Profile Icons Filter Bar */}
+        <div className="bg-white p-4 border border-slate-200 rounded-2xl shadow-sm space-y-6">
+          <div className="flex justify-between items-center">
+             <h3 className="font-bold text-xs text-slate-700 uppercase tracking-wider">Filter by Owner</h3>
+             <button
+               onClick={() => setSelectedVaultOwner(null)}
+               className={`text-[10px] font-bold px-3 py-1 rounded-full border ${!selectedVaultOwner ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-slate-50 border-slate-200 text-slate-600'}`}
+            >
+                Clear Filter
+            </button>
+          </div>
+
+          <div className="space-y-4">
+             <div className="space-y-2">
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Customers</h4>
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+                  {customerOwners.map(owner => (
+                    <button
+                      key={owner.id}
+                      onClick={() => setSelectedVaultOwner(owner.id)}
+                      className={`flex items-center space-x-2 px-3 py-1.5 rounded-full border transition-all shrink-0 ${
+                        selectedVaultOwner === owner.id
+                          ? 'bg-indigo-50 border-indigo-400 text-indigo-700 ring-2 ring-indigo-500/10 font-bold'
+                          : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                      }`}
+                      title={owner.name}
+                    >
+                      <div className="w-6 h-6 rounded-full overflow-hidden bg-white border border-slate-200/80 shrink-0">
+                          <img
+                              src={owner.photo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(owner.name)}`}
+                              alt={owner.name}
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                          />
+                      </div>
+                      <span className="text-[11px] truncate max-w-[90px]">{owner.name}</span>
+                    </button>
+                  ))}
+                  {customerOwners.length === 0 && (
+                     <span className="text-[11px] text-slate-400 italic">No customers registered.</span>
+                  )}
+                </div>
+             </div>
+
+             <hr className="border-slate-100" />
+
+             <div className="space-y-2">
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Agents</h4>
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+                  {agentOwners.map(owner => (
+                    <button
+                      key={owner.id}
+                      onClick={() => setSelectedVaultOwner(owner.id)}
+                      className={`flex items-center space-x-2 px-3 py-1.5 rounded-full border transition-all shrink-0 ${
+                        selectedVaultOwner === owner.id
+                          ? 'bg-indigo-50 border-indigo-400 text-indigo-700 ring-2 ring-indigo-500/10 font-bold'
+                          : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                      }`}
+                      title={owner.name}
+                    >
+                      <div className="w-6 h-6 rounded-full overflow-hidden bg-white border border-slate-200/80 shrink-0">
+                          <img
+                              src={owner.photo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(owner.name)}`}
+                              alt={owner.name}
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                          />
+                      </div>
+                      <span className="text-[11px] truncate max-w-[90px]">{owner.name}</span>
+                    </button>
+                  ))}
+                  {agentOwners.length === 0 && (
+                     <span className="text-[11px] text-slate-400 italic">No agents registered.</span>
+                  )}
+                </div>
+             </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
           <div className="bg-white p-4 border border-slate-200 rounded-2xl shadow-sm flex flex-col md:flex-row gap-3">
             <div className="relative flex-1 text-xs">
               <input
+                id="search-documents-input"
                 type="text"
-                placeholder="Search scans (e.g. Aron Joseph, Aadhaar)..."
+                placeholder="Search by Document Name, Customer, or Candidate..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-55 border border-slate-200 rounded-xl py-2 pl-9 pr-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-9 pr-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 hover:border-slate-350 transition-colors"
               />
               <Search className="absolute left-3 top-2.5 text-slate-400" size={14} />
             </div>
 
             <select
+              id="selected-category-filter"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="bg-slate-55 border border-slate-200 rounded-xl px-3 text-xs text-slate-800"
+              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 hover:border-slate-350 transition-colors cursor-pointer"
             >
-              <option value="all">-- All Categories --</option>
-              <option value="Corporate">Corporate Documents</option>
-              <option value="Customer">Customer KYC Documents</option>
-              <option value="Candidate">Candidate Training Documents</option>
-              <option value="Aadhaar">Aadhaar Files</option>
-              <option value="PAN">PAN Files</option>
+              <option value="all">-- All Documents --</option>
+              <option value="Customer">Customer KYC Documents Only</option>
+              <option value="Candidate">Candidate Training Documents Only</option>
+              <option value="Aadhaar">Aadhaar Card copy</option>
+              <option value="PAN">PAN Card copy</option>
+              <option value="photo">Passport Size Photo</option>
+              <option value="Income">Income Proof certificate</option>
+              <option value="Education">Education Certificate</option>
+              <option value="Signature">Signature Specimen scan</option>
+              <option value="Passport">Indian Passport Copy</option>
             </select>
           </div>
 
@@ -253,58 +388,14 @@ export default function Documents({ candidates = [], customers = [] }) {
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center space-x-1.5 pb-2 border-b border-slate-100">
-              <FileUp size={15} className="text-indigo-600" />
-              <span>Publish Corporate Material</span>
-            </h4>
-
-            <form onSubmit={handleUploadCorpDoc} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Doc Title / File Name *</label>
-                <input
-                  required
-                  type="text"
-                  placeholder="e.g. Life proposal form 300.pdf"
-                  value={newCorpName}
-                  onChange={(e) => setNewCorpName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Category / Label</label>
-                <select
-                  value={newCorpCat}
-                  onChange={(e) => setNewCorpCat(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-850"
-                >
-                  <option value="Corporate Policy">Corporate Policy</option>
-                  <option value="Sales Material">Sales Material</option>
-                  <option value="Onboarding Checklist">Onboarding Checklist</option>
-                  <option value="Standard Form Template">Standard Form Template</option>
-                </select>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-2 px-3 rounded-lg text-xs transition-colors cursor-pointer"
-              >
-                Upload to Corporate Vault
-              </button>
-            </form>
-          </div>
-
-          <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-2 text-xs">
-            <p className="font-extrabold text-slate-800 flex items-center space-x-1.5">
-              <ShieldCheck size={16} className="text-emerald-600" />
-              <span>Compliant & Encrypted Storage</span>
-            </p>
-            <p className="text-slate-500 leading-relaxed text-[11px]">
-              Every administrative file uploaded to Aynkaran Consultants is cached in the local sandbox matching IRDAI strict compliance parameters. Offline file signatures are checked at startup.
-            </p>
-          </div>
+        <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-2 text-xs">
+          <p className="font-extrabold text-slate-800 flex items-center space-x-1.5">
+            <ShieldCheck size={16} className="text-emerald-600" />
+            <span>Compliant & Encrypted Storage</span>
+          </p>
+          <p className="text-slate-500 leading-relaxed text-[11px]">
+            Every administrative file uploaded to Aynkaran Consultants is cached in the local sandbox matching IRDAI strict compliance parameters. Offline file signatures are checked at startup.
+          </p>
         </div>
       </div>
 
@@ -329,11 +420,12 @@ export default function Documents({ candidates = [], customers = [] }) {
             <div className="bg-slate-50 rounded-xl p-4 border border-dashed border-slate-200/80 flex items-center justify-center min-h-[300px]">
               {previewDoc.url ? (
                 previewDoc.url.startsWith('data:image/') || previewDoc.url.match(/\.(jpeg|jpg|gif|png)$/i) || (previewDoc.url.includes('/uploads/') && !previewDoc.url.includes('.pdf')) ? (
-                  <img
+                      <img
                     src={getFileUrl(previewDoc.url)}
                     alt={previewDoc.name}
                     className="max-w-full max-h-[50vh] object-contain rounded-lg shadow-sm"
                     referrerPolicy="no-referrer"
+                    onError={(e) => { e.target.src = 'https://api.dicebear.com/7.x/initials/svg?seed=Err'; }}
                   />
                 ) : previewDoc.url.startsWith('data:application/pdf') || previewDoc.url.includes('.pdf') ? (
                   <iframe

@@ -27,6 +27,7 @@ export const POLICY_STAGES = [
 export default function PolicySales({ policies = [], addPolicy, updatePolicy, deletePolicy, customers = [] }) {
   const [selectedLead, setSelectedLead] = useState(null);
   const [isAddingLead, setIsAddingLead] = useState(false);
+  const [renewalSuccessMsg, setRenewalSuccessMsg] = useState('');
 
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [customCustomerName, setCustomCustomerName] = useState('');
@@ -410,7 +411,7 @@ export default function PolicySales({ policies = [], addPolicy, updatePolicy, de
                     </button>
                   </div>
                 ) : (
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1.5 text-xs text-emerald-800">
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2 text-xs text-emerald-800">
                     <p className="font-extrabold flex items-center space-x-1">
                       <CheckCircle size={14} className="text-emerald-600" />
                       <span>Policy Active</span>
@@ -421,6 +422,37 @@ export default function PolicySales({ policies = [], addPolicy, updatePolicy, de
                     <p className="text-slate-600 text-[11px]">
                       Renewal cycle scheduled for: <strong>{selectedLead.renewalDate}</strong>
                     </p>
+                    
+                    <div className="pt-2 border-t border-emerald-100">
+                      <button
+                        onClick={() => {
+                          const oldDate = new Date(selectedLead.renewalDate);
+                          if (!isNaN(oldDate.getTime())) {
+                            oldDate.setFullYear(oldDate.getFullYear() + 1);
+                            const nextRenewalDateStr = oldDate.toISOString().split('T')[0];
+                            const updated = {
+                              ...selectedLead,
+                              renewalDate: nextRenewalDateStr,
+                              pendingStageSince: new Date().toISOString().split('T')[0]
+                            };
+                            updatePolicy(selectedLead.id, updated);
+                            setSelectedLead(updated);
+                            setRenewalSuccessMsg(`Renewal marked completed! Advanced renewal to ${nextRenewalDateStr} and auto-completed related reminders.`);
+                            setTimeout(() => setRenewalSuccessMsg(''), 7000);
+                          }
+                        }}
+                        className="w-full inline-flex items-center justify-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-[10px] rounded-lg transition-all cursor-pointer shadow-sm hover:shadow"
+                      >
+                        <CheckCircle size={12} />
+                        <span>Complete Renewal Cycle (+1 Year)</span>
+                      </button>
+                    </div>
+
+                    {renewalSuccessMsg && (
+                      <div className="mt-1.5 p-2 bg-emerald-600 text-white font-semibold rounded text-[10px] animate-fade-in">
+                        {renewalSuccessMsg}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -531,10 +563,8 @@ export default function PolicySales({ policies = [], addPolicy, updatePolicy, de
                   onChange={(e) => setPremiumTerm(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-slate-800 text-xs"
                 >
-                  <option value="Yearly">Yearly Term</option>
-                  <option value="Half-Yearly">Half-Yearly Term</option>
-                  <option value="Quarterly">Quarterly Term</option>
-                  <option value="Monthly">Monthly ECS Term</option>
+                  <option value="Yearly">Yearly (Annual) Mode</option>
+                  <option value="Monthly">Monthly ECS (Electronic Clearing Service)</option>
                 </select>
               </div>
 
