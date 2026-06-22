@@ -129,7 +129,7 @@ async function startServer() {
     const trimmedUser = username.trim();
     
     // Superadmin fallback check
-    if (trimmedUser === 'admin' && password === 'admin@aynakaran') {
+    if (trimmedUser === 'admin' && password === 'admin@aynkaran') {
       await logActivity('admin', 'Logged In', 'Command Center Session Active');
       return res.json({
         success: true,
