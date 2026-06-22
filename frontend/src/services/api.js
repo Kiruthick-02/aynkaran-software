@@ -36,7 +36,13 @@ export const apiService = {
   getHealth: () => request('/health'),
 
   // --- CUSTOMER PROFILE ERP ---
-  getCustomers: () => request('/customers'),
+  getCustomers: (role, username, supervise) => {
+    let q = (role && username) ? `?role=${encodeURIComponent(role)}&username=${encodeURIComponent(username)}` : '';
+    if (supervise) {
+      q += q ? '&supervise=true' : '?supervise=true';
+    }
+    return request(`/customers${q}`);
+  },
   createCustomer: (customer) => request('/customers', {
     method: 'POST',
     body: JSON.stringify(customer)
@@ -45,9 +51,16 @@ export const apiService = {
     method: 'PUT',
     body: JSON.stringify(customer)
   }),
-  deleteCustomer: (id) => request(`/customers/${encodeURIComponent(id)}`, {
-    method: 'DELETE'
-  }),
+  deleteCustomer: (id, role, username, otp) => {
+    let q = '';
+    if (role && username) {
+      q = `?role=${encodeURIComponent(role)}&username=${encodeURIComponent(username)}`;
+      if (otp) q += `&otp=${encodeURIComponent(otp)}`;
+    }
+    return request(`/customers/${encodeURIComponent(id)}${q}`, {
+      method: 'DELETE'
+    });
+  },
 
   // --- AGENT RECRUITMENT PIPELINE CANDIDATES ---
   getCandidates: () => request('/candidates'),
@@ -64,7 +77,13 @@ export const apiService = {
   }),
 
   // --- POLICY SALES LIFECYCLE ---
-  getPolicies: () => request('/policies'),
+  getPolicies: (role, username, supervise) => {
+    let q = (role && username) ? `?role=${encodeURIComponent(role)}&username=${encodeURIComponent(username)}` : '';
+    if (supervise) {
+      q += q ? '&supervise=true' : '?supervise=true';
+    }
+    return request(`/policies${q}`);
+  },
   createPolicy: (policy) => request('/policies', {
     method: 'POST',
     body: JSON.stringify(policy)
@@ -73,12 +92,22 @@ export const apiService = {
     method: 'PUT',
     body: JSON.stringify(policy)
   }),
-  deletePolicy: (id) => request(`/policies/${encodeURIComponent(id)}`, {
-    method: 'DELETE'
-  }),
+  deletePolicy: (id, role, username, otp) => {
+    let q = '';
+    if (role && username) {
+      q = `?role=${encodeURIComponent(role)}&username=${encodeURIComponent(username)}`;
+      if (otp) q += `&otp=${encodeURIComponent(otp)}`;
+    }
+    return request(`/policies/${encodeURIComponent(id)}${q}`, {
+      method: 'DELETE'
+    });
+  },
 
   // --- TRIGGER REMINDERS CONSOLE ---
-  getReminders: () => request('/reminders'),
+  getReminders: (role, username) => {
+    const q = (role && username) ? `?role=${encodeURIComponent(role)}&username=${encodeURIComponent(username)}` : '';
+    return request(`/reminders${q}`);
+  },
   triggerCronScan: () => request('/reminders/trigger-cron', {
     method: 'POST'
   }),
@@ -98,6 +127,32 @@ export const apiService = {
   syncDatabase: (data) => request('/sync', {
     method: 'POST',
     body: JSON.stringify(data)
+  }),
+
+  // --- AUTH & STAFF MANAGEMENT SYSTEMS ---
+  loginUser: (username, password) => request('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password })
+  }),
+  logoutUser: (username) => request('/auth/logout', {
+    method: 'POST',
+    body: JSON.stringify({ username })
+  }),
+  registerStaff: (username, password, displayName, requesterRole) => request('/auth/register-staff', {
+    method: 'POST',
+    body: JSON.stringify({ username, password, displayName, requesterRole })
+  }),
+  getStaffList: () => request('/auth/staff-list'),
+  deleteStaff: (username) => request(`/auth/delete-staff/${encodeURIComponent(username)}`, {
+    method: 'DELETE'
+  }),
+  getStaffLogs: () => request('/auth/staff-logs'),
+  clearStaffLogs: () => request('/auth/staff-logs', {
+    method: 'DELETE'
+  }),
+  requestDeleteOTP: (username, targetId, targetType, targetName) => request('/auth/request-otp', {
+    method: 'POST',
+    body: JSON.stringify({ username, targetId, targetType, targetName })
   }),
 
   // --- MULTIPART SECURE BINARY DOCUMENT UPLOADER ---

@@ -13,10 +13,14 @@ import {
   Trash2,
 } from 'lucide-react';
 
-export default function Reminders({ reminders = [], addReminder, updateReminder, deleteReminder, triggerAutomatedReminders }) {
+export default function Reminders({ reminders = [], addReminder, updateReminder, deleteReminder, triggerAutomatedReminders, userRole = 'SuperAdmin' }) {
   const [filterType, setFilterType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [successToast, setSuccessToast] = useState(null);
+
+  const visibleReminders = userRole === 'Staff'
+    ? reminders.filter(r => r.targetType !== 'recruitment')
+    : reminders;
 
 
   const handleBroadcastSimulation = (reminder, channel) => {
@@ -39,7 +43,7 @@ export default function Reminders({ reminders = [], addReminder, updateReminder,
   };
 
   const toggleReminderComplete = (id) => {
-    const r = reminders.find((item) => item.id === id);
+    const r = visibleReminders.find((item) => item.id === id);
     if (r) {
       updateReminder(id, { completed: !r.completed });
     }
@@ -53,12 +57,12 @@ export default function Reminders({ reminders = [], addReminder, updateReminder,
 
   const handleClearCompleted = () => {
     if (confirm('Clear all completed notification tasks from historic logs?')) {
-      const completed = reminders.filter((r) => r.completed);
+      const completed = visibleReminders.filter((r) => r.completed);
       completed.forEach((r) => deleteReminder(r.id));
     }
   };
 
-  const filtered = reminders
+  const filtered = visibleReminders
     .filter((r) => {
       if (filterType === 'all') return true;
       if (filterType === 'pending') return !r.completed;
@@ -76,7 +80,7 @@ export default function Reminders({ reminders = [], addReminder, updateReminder,
             Monitor trigger schedules (1 month, 3 weeks, 2 weeks, 1 week, 3 days, and 1 day before) and dispatch announcements to clients & agents.
           </p>
         </div>
-        {reminders.some((r) => r.completed) && (
+        {visibleReminders.some((r) => r.completed) && (
           <button
             onClick={handleClearCompleted}
             className="mt-3 sm:mt-0 text-rose-600 hover:text-rose-800 font-bold text-xs bg-rose-50 border border-rose-200 px-3 py-2 rounded-xl transition-all hover:cursor-pointer"
@@ -117,7 +121,7 @@ export default function Reminders({ reminders = [], addReminder, updateReminder,
             { id: 'all', label: 'All Alerts' },
             { id: 'pending', label: 'Active Reminders' },
             { id: 'completed', label: 'Archived / Complete' },
-            { id: 'recruitment', label: 'Recruitment Delays' },
+            ...(userRole === 'Staff' ? [] : [{ id: 'recruitment', label: 'Recruitment Delays' }]),
             { id: 'renewal', label: 'Contract Renewals' },
           ].map((cat) => (
             <button

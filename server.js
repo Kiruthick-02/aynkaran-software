@@ -45,22 +45,27 @@ const DB_FILE = path.join(process.cwd(), 'database.json');
 
 // Helper to load current database state safely
 function loadDatabase() {
+  const defaultState = {
+    customers: [],
+    candidates: [],
+    policies: [],
+    reminders: [],
+    users: [],
+    logs: []
+  };
+
   if (fs.existsSync(DB_FILE)) {
     try {
       const content = fs.readFileSync(DB_FILE, 'utf-8');
-      return JSON.parse(content);
+      const parsed = JSON.parse(content);
+      return { ...defaultState, ...parsed };
     } catch (e) {
       console.error('Failed to parse database file, loading default state', e);
     }
   }
 
   // Fallback initial data matched with Aynkaran office databases
-  return {
-    customers: [],
-    candidates: [],
-    policies: [],
-    reminders: [],
-  };
+  return defaultState;
 }
 
 // Save database state securely
@@ -88,6 +93,271 @@ async function startServer() {
 
   // Initialize DB instance
   const db = loadDatabase();
+
+  const activeOTPs = {};
+
+  async function logActivity(username, action, target) {
+    const logObj = {
+      id: `log-${Date.now().toString().slice(-5)}`,
+      username,
+      action,
+      target,
+      timestamp: new Date().toISOString()
+    };
+    if (mongoDbConnection) {
+      try {
+        await mongoDbConnection.collection('logs').insertOne({ ...logObj });
+      } catch (e) {
+        console.error('Failed to log to MongoDB collection:', e);
+      }
+    } else {
+      db.logs = db.logs || [];
+      db.logs.unshift(logObj);
+      saveDatabase(db);
+    }
+  }
+
+  // --- STAFF & ROLE MANAGEMENT ENDPOINTS ---
+
+  // User auth login
+  app.post('/api/auth/login', async (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password credentials are required.' });
+    }
+
+    const trimmedUser = username.trim();
+    
+    // Superadmin fallback check
+    if (trimmedUser === 'admin' && password === 'admin@aynakaran') {
+      await logActivity('admin', 'Logged In', 'Command Center Session Active');
+      return res.json({
+        success: true,
+        user: { username: 'admin', displayName: 'Aynkaran Admin', role: 'SuperAdmin' }
+      });
+    }
+
+    // Try Staff validation from DB
+    let usersList = [];
+    if (mongoDbConnection) {
+      try {
+        usersList = await mongoDbConnection.collection('users').find().toArray();
+      } catch (e) {
+        console.error('MongoDB users lookup error:', e);
+      }
+    } else {
+      usersList = db.users || [];
+    }
+
+    const matchedUser = usersList.find(u => u.username === trimmedUser && u.password === password);
+    if (matchedUser) {
+      await logActivity(trimmedUser, 'Logged In', 'Staff Gateway Active');
+      return res.json({
+        success: true,
+        user: { username: trimmedUser, displayName: matchedUser.displayName || trimmedUser, role: 'Staff' }
+      });
+    }
+
+    res.status(401).json({ error: 'Invalid Username or Password!' });
+  });
+
+  // Create staff (SuperAdmin only)
+  app.post('/api/auth/register-staff', async (req, res) => {
+    const { username, password, displayName, requesterRole } = req.body;
+    if (requesterRole !== 'SuperAdmin') {
+      return res.status(403).json({ error: 'Unauthorized. Only Superadmin can create Staff login credentials.' });
+    }
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required.' });
+    }
+
+    const newStaff = {
+      id: `usr-${Date.now().toString().slice(-5)}`,
+      username: username.trim(),
+      password,
+      displayName: displayName || username.trim(),
+      role: 'Staff',
+      createdAt: new Date().toISOString()
+    };
+
+    if (mongoDbConnection) {
+      try {
+        const exists = await mongoDbConnection.collection('users').findOne({ username: newStaff.username });
+        if (exists) {
+          return res.status(400).json({ error: 'Username already exists!' });
+        }
+        await mongoDbConnection.collection('users').insertOne(newStaff);
+      } catch (err) {
+        return res.status(500).json({ error: err.message });
+      }
+    } else {
+      db.users = db.users || [];
+      if (db.users.some(u => u.username === newStaff.username)) {
+        return res.status(400).json({ error: 'Username already exists!' });
+      }
+      db.users.unshift(newStaff);
+      saveDatabase(db);
+    }
+
+    await logActivity('admin', 'Registered Staff User', `Username: ${newStaff.username}`);
+    res.status(201).json({ success: true, user: newStaff });
+  });
+
+  // Get staff list (SuperAdmin only)
+  app.get('/api/auth/staff-list', async (req, res) => {
+    let list = [];
+    if (mongoDbConnection) {
+      try {
+        list = await mongoDbConnection.collection('users').find({ role: 'Staff' }).toArray();
+        list = list.map(r => ({ ...r, _id: undefined }));
+      } catch (err) {
+        return res.status(500).json({ error: err.message });
+      }
+    } else {
+      list = (db.users || []).filter(u => u.role === 'Staff');
+    }
+    res.json(list);
+  });
+
+  // Delete staff (SuperAdmin only)
+  app.delete('/api/auth/delete-staff/:username', async (req, res) => {
+    const { username } = req.params;
+    if (mongoDbConnection) {
+      try {
+        await mongoDbConnection.collection('users').deleteOne({ username });
+      } catch (err) {
+        return res.status(500).json({ error: err.message });
+      }
+    } else {
+      db.users = (db.users || []).filter(u => u.username !== username);
+      saveDatabase(db);
+    }
+
+    await logActivity('admin', 'Deleted Staff User', `Username: ${username}`);
+    res.json({ success: true, message: 'Staff credentials cleared successfully.' });
+  });
+
+  // User auth logout
+  app.post('/api/auth/logout', async (req, res) => {
+    const { username } = req.body;
+    await logActivity(username || 'admin', 'Logged Out', 'Session Closed');
+    res.json({ success: true });
+  });
+
+  // Get activity logs (SuperAdmin only)
+  app.get('/api/auth/staff-logs', async (req, res) => {
+    let list = [];
+    if (mongoDbConnection) {
+      try {
+        list = await mongoDbConnection.collection('logs').find().sort({ timestamp: -1 }).toArray();
+        list = list.map(r => ({ ...r, _id: undefined }));
+      } catch (err) {
+        return res.status(500).json({ error: err.message });
+      }
+    } else {
+      list = db.logs || [];
+    }
+    res.json(list);
+  });
+
+  // Clear activity logs (SuperAdmin only)
+  app.delete('/api/auth/staff-logs', async (req, res) => {
+    if (mongoDbConnection) {
+      try {
+        await mongoDbConnection.collection('logs').deleteMany({});
+      } catch (err) {
+        return res.status(500).json({ error: err.message });
+      }
+    } else {
+      db.logs = [];
+      saveDatabase(db);
+    }
+    await logActivity('admin', 'Cleared Staff Activity Logs', 'All logs deleted');
+    res.json({ success: true, message: 'Activity logs cleared.' });
+  });
+
+  // Request deletion OTP (Staff only)
+  app.post('/api/auth/request-otp', async (req, res) => {
+    const { username, action, targetId, targetType, targetName } = req.body;
+    
+    // Generate valid 6-digit OTP code
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Store in-memory for verification
+    activeOTPs[username] = {
+      otp: otpCode,
+      targetId,
+      targetType,
+      timestamp: Date.now()
+    };
+
+    if (mongoDbConnection) {
+      try {
+        await mongoDbConnection.collection('otps').updateOne(
+          { username },
+          {
+            $set: {
+              otp: otpCode,
+              targetId,
+              targetType,
+              timestamp: Date.now()
+            }
+          },
+          { upsert: true }
+        );
+      } catch (err) {
+        console.error('Failed to write OTP to MongoDB:', err);
+      }
+    }
+
+    console.log(`
+============================ OTP OUTBOX SIMULATOR ============================
+[Service Alert] Trigger OTP for deletion of ${targetType}
+SuperAdmin Email : kiruthickrn@gmail.com
+Staff Member     : ${username}
+Request Target   : ID ${targetId} (${targetName || 'Unnamed'})
+OTP CODE         : ${otpCode}
+=============================================================================
+`);
+
+    // Write log activity
+    await logActivity(username, 'Requested OTP Deletion', `${targetType} Item ID: ${targetId}`);
+
+    // Send real/sandbox email receipt to Superadmin with OTP code
+    try {
+      const emailSubject = `[ACTION REQUIRED] OTP Verification for Deletion of ${targetType.toUpperCase()}`;
+      const emailBody = `Hello Superadmin,
+
+A staff member (@${username}) is requesting authorization to delete a record in the Aynkaran Consultants CRM:
+
+- Resource Type: ${targetType.toUpperCase()}
+- Record ID: ${targetId}
+- Record Name: ${targetName || 'Unnamed / N/A'}
+- Requested By: @${username}
+- Time of Request: ${new Date().toLocaleString()}
+
+Security Verification One-Time Password (OTP):
+--------------------------------------------------
+OTP CODE: ${otpCode}
+--------------------------------------------------
+
+Please convey this verification code to the staff member so they can safely authorize and execute the deletion.
+
+Best regards,
+Aynkaran Business CRM Autopilot`;
+
+      await sendEmailReceipt('kiruthickrn@gmail.com', emailSubject, emailBody);
+      console.log(`[Email Dispatcher] Dispatched deletion OTP email for staff @${username} to kiruthickrn@gmail.com`);
+    } catch (emailErr) {
+      console.error('[Email Dispatcher] Failed to dispatch deletion OTP:', emailErr);
+    }
+
+    res.json({
+      success: true,
+      message: `An authorization OTP has been issued and dispatched to Superadmin's registered email (kiruthickrn@gmail.com).`
+    });
+  });
 
   // Document management endpoints to handle document vaults and uploads
   app.use('/api/documents', (req, res, next) => {
@@ -130,63 +400,124 @@ async function startServer() {
 
   // --- CUSTOMER ENDPOINTS ---
   app.get('/api/customers', async (req, res) => {
+    const { role, username } = req.query;
+    let list = [];
+
     if (mongoDbConnection) {
       try {
-        const list = await mongoDbConnection.collection('customers').find().sort({ createdAt: -1 }).toArray();
-        res.json(list.map(r => ({ ...r, _id: undefined })));
+        list = await mongoDbConnection.collection('customers').find().sort({ createdAt: -1 }).toArray();
+        list = list.map(r => ({ ...r, _id: undefined }));
       } catch (err) {
-        res.status(500).json({ error: err.message });
+        return res.status(500).json({ error: err.message });
       }
     } else {
-      res.json(db.customers);
+      list = db.customers || [];
     }
+
+    // Filter logic: Staff CANNOT see Superadmin's customers. Only their own!
+    // SuperAdmin CANNOT see Staff's customers. Only their own!
+    if (role === 'Staff' && username) {
+      list = list.filter(c => c.createdBy === username);
+    } else if (req.query.all === 'true' || req.query.supervise === 'true') {
+      // Return everything for supervision
+    } else {
+      list = list.filter(c => !c.createdBy || c.createdBy === 'admin');
+    }
+
+    res.json(list);
   });
 
   app.post('/api/customers', async (req, res) => {
+    const creator = req.body.createdBy || 'admin';
     const newCustomer = {
       ...req.body,
       id: req.body.id || `cust-${Date.now().toString().slice(-5)}`,
       createdAt: req.body.createdAt || new Date().toISOString(),
+      createdBy: creator
     };
+
     if (mongoDbConnection) {
       try {
         await mongoDbConnection.collection('customers').insertOne({ ...newCustomer });
-        res.status(201).json(newCustomer);
       } catch (err) {
-        res.status(400).json({ error: err.message });
+        return res.status(400).json({ error: err.message });
       }
     } else {
       db.customers.unshift(newCustomer);
       saveDatabase(db);
-      res.status(201).json(newCustomer);
     }
+
+    await logActivity(creator, 'Created Customer', `Customer: ${newCustomer.name} (ID: ${newCustomer.id})`);
+    res.status(201).json(newCustomer);
   });
 
   app.put('/api/customers/:id', async (req, res) => {
     const { id } = req.params;
+    const modifier = req.body.updatedBy || 'admin';
+    const updateData = { ...req.body };
+    delete updateData._id;
+    delete updateData.updatedBy;
+
     if (mongoDbConnection) {
       try {
-        const updateData = { ...req.body };
-        delete updateData._id;
         await mongoDbConnection.collection('customers').updateOne({ id }, { $set: updateData });
-        res.json({ id, ...updateData });
       } catch (err) {
-        res.status(400).json({ error: err.message });
+        return res.status(400).json({ error: err.message });
       }
     } else {
       const index = db.customers.findIndex((c) => c.id === id);
       if (index !== -1) {
-        db.customers[index] = { ...db.customers[index], ...req.body };
+        db.customers[index] = { ...db.customers[index], ...updateData };
         saveDatabase(db);
-        res.json(db.customers[index]);
       } else {
-        res.status(404).json({ error: 'Customer profile not found' });
+        return res.status(404).json({ error: 'Customer profile not found' });
       }
     }
+
+    await logActivity(modifier, 'Updated Customer Info', `Customer ID: ${id}`);
+    res.json({ id, ...updateData });
   });
 
   app.delete('/api/customers/:id', async (req, res) => {
     const { id } = req.params;
+    const { role, username, otp } = req.query;
+
+    if (role === 'Staff' && username) {
+      if (!otp) {
+        return res.status(403).json({ error: 'Authorizing OTP is required for Staff delete operations.' });
+      }
+
+      let isValidOtp = false;
+      if (mongoDbConnection) {
+        try {
+          const activeOtpRecord = await mongoDbConnection.collection('otps').findOne({ username });
+          if (activeOtpRecord && activeOtpRecord.otp === otp && activeOtpRecord.targetId === id) {
+            isValidOtp = true;
+            await mongoDbConnection.collection('otps').deleteOne({ username });
+          }
+        } catch (err) {
+          console.error('Error fetching OTP from MongoDB:', err);
+        }
+      }
+
+      // Check in-memory fallback if not validated via DB
+      if (!isValidOtp) {
+        const activeOtpRecord = activeOTPs[username];
+        if (activeOtpRecord && activeOtpRecord.otp === otp && activeOtpRecord.targetId === id) {
+          isValidOtp = true;
+          delete activeOTPs[username];
+        }
+      }
+
+      if (!isValidOtp) {
+        return res.status(400).json({ error: 'Invalid or expired OTP code. Clear aborted.' });
+      }
+
+      await logActivity(username, 'Deleted Customer CRM (OTP Verified)', `Customer ID: ${id}`);
+    } else {
+      await logActivity(username || 'admin', 'Deleted Customer CRM (Direct)', `Customer ID: ${id}`);
+    }
+
     if (mongoDbConnection) {
       try {
         await mongoDbConnection.collection('customers').deleteOne({ id });
@@ -335,63 +666,124 @@ async function startServer() {
 
   // --- POLICY LEAD ENDPOINTS ---
   app.get('/api/policies', async (req, res) => {
+    const { role, username } = req.query;
+    let list = [];
+
     if (mongoDbConnection) {
       try {
-        const list = await mongoDbConnection.collection('policies').find().toArray();
-        res.json(list.map(r => ({ ...r, _id: undefined })));
+        list = await mongoDbConnection.collection('policies').find().toArray();
+        list = list.map(r => ({ ...r, _id: undefined }));
       } catch (err) {
-        res.status(500).json({ error: err.message });
+        return res.status(500).json({ error: err.message });
       }
     } else {
-      res.json(db.policies);
+      list = db.policies || [];
     }
+
+    // Filter logic: Staff CANNOT see Superadmin's policies. Only their own!
+    // SuperAdmin CANNOT see Staff's policies. Only their own!
+    if (role === 'Staff' && username) {
+      list = list.filter(p => p.createdBy === username);
+    } else if (req.query.all === 'true' || req.query.supervise === 'true') {
+      // Return everything for supervision
+    } else {
+      list = list.filter(p => !p.createdBy || p.createdBy === 'admin');
+    }
+
+    res.json(list);
   });
 
   app.post('/api/policies', async (req, res) => {
+    const creator = req.body.createdBy || 'admin';
     const newPolicy = {
       ...req.body,
       id: req.body.id || `pol-${Date.now().toString().slice(-5)}`,
       pendingStageSince: req.body.pendingStageSince || new Date().toISOString().split('T')[0],
+      createdBy: creator
     };
+
     if (mongoDbConnection) {
       try {
         await mongoDbConnection.collection('policies').insertOne({ ...newPolicy });
-        res.status(201).json(newPolicy);
       } catch (err) {
-        res.status(400).json({ error: err.message });
+        return res.status(400).json({ error: err.message });
       }
     } else {
       db.policies.unshift(newPolicy);
       saveDatabase(db);
-      res.status(201).json(newPolicy);
     }
+
+    await logActivity(creator, 'Created Policy Sales Lead', `Policy: ${newPolicy.customerName} - ${newPolicy.policyType} (ID: ${newPolicy.id})`);
+    res.status(201).json(newPolicy);
   });
 
   app.put('/api/policies/:id', async (req, res) => {
     const { id } = req.params;
+    const modifier = req.body.updatedBy || 'admin';
+    const updateData = { ...req.body };
+    delete updateData._id;
+    delete updateData.updatedBy;
+
     if (mongoDbConnection) {
       try {
-        const updateData = { ...req.body };
-        delete updateData._id;
         await mongoDbConnection.collection('policies').updateOne({ id }, { $set: updateData });
-        res.json({ id, ...updateData });
       } catch (err) {
-        res.status(400).json({ error: err.message });
+        return res.status(400).json({ error: err.message });
       }
     } else {
       const index = db.policies.findIndex((p) => p.id === id);
       if (index !== -1) {
-        db.policies[index] = { ...db.policies[index], ...req.body };
+        db.policies[index] = { ...db.policies[index], ...updateData };
         saveDatabase(db);
-        res.json(db.policies[index]);
       } else {
-        res.status(404).json({ error: 'Policy lead not found' });
+        return res.status(404).json({ error: 'Policy lead not found' });
       }
     }
+
+    await logActivity(modifier, 'Updated Policy Sales Info', `Policy ID: ${id}`);
+    res.json({ id, ...updateData });
   });
 
   app.delete('/api/policies/:id', async (req, res) => {
     const { id } = req.params;
+    const { role, username, otp } = req.query;
+
+    if (role === 'Staff' && username) {
+      if (!otp) {
+        return res.status(403).json({ error: 'Authorizing OTP is required for Staff delete operations.' });
+      }
+
+      let isValidOtp = false;
+      if (mongoDbConnection) {
+        try {
+          const activeOtpRecord = await mongoDbConnection.collection('otps').findOne({ username });
+          if (activeOtpRecord && activeOtpRecord.otp === otp && activeOtpRecord.targetId === id) {
+            isValidOtp = true;
+            await mongoDbConnection.collection('otps').deleteOne({ username });
+          }
+        } catch (err) {
+          console.error('Error fetching OTP from MongoDB:', err);
+        }
+      }
+
+      // Check in-memory fallback if not validated via DB
+      if (!isValidOtp) {
+        const activeOtpRecord = activeOTPs[username];
+        if (activeOtpRecord && activeOtpRecord.otp === otp && activeOtpRecord.targetId === id) {
+          isValidOtp = true;
+          delete activeOTPs[username];
+        }
+      }
+
+      if (!isValidOtp) {
+        return res.status(400).json({ error: 'Invalid or expired OTP code. Clear aborted.' });
+      }
+
+      await logActivity(username, 'Deleted Policy Sales (OTP Verified)', `Policy ID: ${id}`);
+    } else {
+      await logActivity(username || 'admin', 'Deleted Policy Sales (Direct)', `Policy ID: ${id}`);
+    }
+
     if (mongoDbConnection) {
       try {
         await mongoDbConnection.collection('policies').deleteOne({ id });
@@ -553,16 +945,57 @@ async function startServer() {
   });
 
   app.get('/api/reminders', async (req, res) => {
+    const { role, username } = req.query;
+    let list = [];
     if (mongoDbConnection) {
       try {
-        const list = await mongoDbConnection.collection('reminders').find().toArray();
-        res.json(list.map(r => ({ ...r, _id: undefined })));
+        list = await mongoDbConnection.collection('reminders').find().toArray();
+        list = list.map(r => ({ ...r, _id: undefined }));
       } catch (err) {
-        res.status(500).json({ error: err.message });
+        return res.status(500).json({ error: err.message });
       }
     } else {
-      res.json(db.reminders);
+      list = db.reminders || [];
     }
+
+    try {
+      let allowedCusts = [];
+      let allowedPols = [];
+      if (mongoDbConnection) {
+        if (role === 'Staff' && username) {
+          allowedCusts = await mongoDbConnection.collection('customers').find({ createdBy: username }).toArray();
+          allowedPols = await mongoDbConnection.collection('policies').find({ createdBy: username }).toArray();
+        } else {
+          allowedCusts = await mongoDbConnection.collection('customers').find({ $or: [{ createdBy: 'admin' }, { createdBy: { $exists: false } }, { createdBy: null }, { createdBy: '' }] }).toArray();
+          allowedPols = await mongoDbConnection.collection('policies').find({ $or: [{ createdBy: 'admin' }, { createdBy: { $exists: false } }, { createdBy: null }, { createdBy: '' }] }).toArray();
+        }
+      } else {
+        if (role === 'Staff' && username) {
+          allowedCusts = (db.customers || []).filter(c => c.createdBy === username);
+          allowedPols = (db.policies || []).filter(p => p.createdBy === username);
+        } else {
+          allowedCusts = (db.customers || []).filter(c => !c.createdBy || c.createdBy === 'admin');
+          allowedPols = (db.policies || []).filter(p => !p.createdBy || p.createdBy === 'admin');
+        }
+      }
+
+      const custIds = new Set(allowedCusts.map(c => c.id));
+      const polIds = new Set(allowedPols.map(p => p.id));
+
+      list = list.filter(r => {
+        if (r.targetType === 'recruitment') {
+          return role !== 'Staff';
+        }
+        if (r.targetType === 'renewal') {
+          return polIds.has(r.targetId);
+        }
+        return custIds.has(r.targetId);
+      });
+    } catch (filterErr) {
+      console.error('Error filtering reminders on server:', filterErr);
+    }
+
+    res.json(list);
   });
 
   app.post('/api/reminders', async (req, res) => {

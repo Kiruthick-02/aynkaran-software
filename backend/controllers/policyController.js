@@ -14,13 +14,23 @@ export class PolicyController {
 
   getAll = async (req, res) => {
     try {
+      const { role, username } = req.query;
       const rows = await this.db.collection('policies').find().sort({ pendingStageSince: -1 }).toArray();
-      const formatted = rows.map(r => ({
+      let formatted = rows.map(r => ({
         ...r,
         id: r.id || r._id.toString(),
         _id: undefined,
         quotes: typeof r.quotes === 'string' ? JSON.parse(r.quotes || '[]') : (r.quotes || []),
       }));
+
+      if (role === 'Staff' && username) {
+        formatted = formatted.filter(p => p.createdBy === username);
+      } else if (req.query.all === 'true' || req.query.supervise === 'true') {
+        // Return unfiltered portfolios for supervision
+      } else {
+        formatted = formatted.filter(p => !p.createdBy || p.createdBy === 'admin');
+      }
+
       res.json(formatted);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -88,6 +98,21 @@ export class PolicyController {
   delete = async (req, res) => {
     try {
       const { id } = req.params;
+      const { role, username, otp } = req.query;
+
+      if (role === 'Staff' && username) {
+        if (!otp) {
+          return res.status(403).json({ error: 'Authorizing OTP is required for Staff delete operations.' });
+        }
+
+        const activeOtpRecord = await this.db.collection('otps').findOne({ username });
+        if (!activeOtpRecord || activeOtpRecord.otp !== otp || activeOtpRecord.targetId !== id) {
+          return res.status(400).json({ error: 'Invalid or expired OTP code. Clear aborted.' });
+        }
+
+        await this.db.collection('otps').deleteOne({ username });
+      }
+
       await this.db.collection('policies').deleteOne({ id });
       res.json({ success: true, message: 'Policy pipeline item removed successfully.' });
     } catch (e) {

@@ -11,6 +11,9 @@ export function AppProvider({ children }) {
   const [adminUser, setAdminUser] = useState(() => {
     return localStorage.getItem('aynakaran_user') || 'admin';
   });
+  const [userRole, setUserRole] = useState(() => {
+    return localStorage.getItem('aynakaran_role') || (localStorage.getItem('aynakaran_user') === 'admin' ? 'SuperAdmin' : 'Staff');
+  });
 
   // Tab navigation selection state
   const [activeTab, setActiveTab] = useState(() => {
@@ -19,48 +22,56 @@ export function AppProvider({ children }) {
 
   // Core Entity States (Pre-populate with local storage or empty fallback arrays)
   const [customers, setCustomers] = useState(() => {
-    const cached = localStorage.getItem('ayn_customers');
+    const username = localStorage.getItem('aynakaran_user') || 'admin';
+    const cached = localStorage.getItem(`ayn_customers_${username}`);
     return cached ? JSON.parse(cached) : [];
   });
 
   const [candidates, setCandidates] = useState(() => {
-    const cached = localStorage.getItem('ayn_candidates');
+    const username = localStorage.getItem('aynakaran_user') || 'admin';
+    const cached = localStorage.getItem(`ayn_candidates_${username}`);
     return cached ? JSON.parse(cached) : [];
   });
 
   const [policies, setPolicies] = useState(() => {
-    const cached = localStorage.getItem('ayn_policies');
+    const username = localStorage.getItem('aynakaran_user') || 'admin';
+    const cached = localStorage.getItem(`ayn_policies_${username}`);
     return cached ? JSON.parse(cached) : [];
   });
 
   const [reminders, setReminders] = useState(() => {
-    const cached = localStorage.getItem('ayn_reminders');
+    const username = localStorage.getItem('aynakaran_user') || 'admin';
+    const cached = localStorage.getItem(`ayn_reminders_${username}`);
     return cached ? JSON.parse(cached) : [];
   });
 
   const [isServerLoaded, setIsServerLoaded] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
 
-  // Synchronize changes to LocalStorage on updates
+  // Synchronize changes to LocalStorage on updates (username-specific)
   useEffect(() => {
-    localStorage.setItem('ayn_customers', JSON.stringify(customers));
-  }, [customers]);
+    if (!isServerLoaded) return;
+    localStorage.setItem(`ayn_customers_${adminUser}`, JSON.stringify(customers));
+  }, [customers, adminUser, isServerLoaded]);
 
   useEffect(() => {
     localStorage.setItem('ayn_active_tab', activeTab);
   }, [activeTab]);
 
   useEffect(() => {
-    localStorage.setItem('ayn_candidates', JSON.stringify(candidates));
-  }, [candidates]);
+    if (!isServerLoaded) return;
+    localStorage.setItem(`ayn_candidates_${adminUser}`, JSON.stringify(candidates));
+  }, [candidates, adminUser, isServerLoaded]);
 
   useEffect(() => {
-    localStorage.setItem('ayn_policies', JSON.stringify(policies));
-  }, [policies]);
+    if (!isServerLoaded) return;
+    localStorage.setItem(`ayn_policies_${adminUser}`, JSON.stringify(policies));
+  }, [policies, adminUser, isServerLoaded]);
 
   useEffect(() => {
-    localStorage.setItem('ayn_reminders', JSON.stringify(reminders));
-  }, [reminders]);
+    if (!isServerLoaded) return;
+    localStorage.setItem(`ayn_reminders_${adminUser}`, JSON.stringify(reminders));
+  }, [reminders, adminUser, isServerLoaded]);
 
   /**
    * Load entire harmonized database dataset from MongoDB Express server
@@ -68,18 +79,21 @@ export function AppProvider({ children }) {
   const loadStateFromServer = useCallback(async () => {
     console.log('[System] Fetching latest CRM states from MongoDB database server...');
     try {
+      const role = localStorage.getItem('aynakaran_role') || (localStorage.getItem('aynakaran_user') === 'admin' ? 'SuperAdmin' : 'Staff');
+      const username = localStorage.getItem('aynakaran_user') || 'admin';
+
       const [custs, cands, pols, rems] = await Promise.all([
-        apiService.getCustomers(),
+        apiService.getCustomers(role, username),
         apiService.getCandidates(),
-        apiService.getPolicies(),
-        apiService.getReminders()
+        apiService.getPolicies(role, username),
+        apiService.getReminders(role, username)
       ]);
 
       // Safely load caches
-      const cachedCusts = JSON.parse(localStorage.getItem('ayn_customers') || '[]');
-      const cachedCands = JSON.parse(localStorage.getItem('ayn_candidates') || '[]');
-      const cachedPols = JSON.parse(localStorage.getItem('ayn_policies') || '[]');
-      const cachedRems = JSON.parse(localStorage.getItem('ayn_reminders') || '[]');
+      const cachedCusts = JSON.parse(localStorage.getItem(`ayn_customers_${username}`) || '[]');
+      const cachedCands = JSON.parse(localStorage.getItem(`ayn_candidates_${username}`) || '[]');
+      const cachedPols = JSON.parse(localStorage.getItem(`ayn_policies_${username}`) || '[]');
+      const cachedRems = JSON.parse(localStorage.getItem(`ayn_reminders_${username}`) || '[]');
 
       let resolvedCusts = Array.isArray(custs) ? custs : [];
       let resolvedCands = Array.isArray(cands) ? cands : [];
@@ -110,6 +124,33 @@ export function AppProvider({ children }) {
         }
       }
 
+      if (role === 'Staff' && username) {
+        resolvedCusts = resolvedCusts.filter(c => c.createdBy === username);
+        resolvedPols = resolvedPols.filter(p => p.createdBy === username);
+        resolvedRems = resolvedRems.filter(r => {
+          if (r.targetType === 'recruitment') return false;
+          if (r.targetType === 'renewal') {
+            return resolvedPols.some(p => p.id === r.targetId);
+          }
+          return resolvedCusts.some(c => c.id === r.targetId);
+        });
+      } else {
+        // SuperAdmin restricts policies and customers to their own (not created by staff)
+        resolvedPols = resolvedPols.filter(p => !p.createdBy || p.createdBy === 'admin');
+        resolvedCusts = resolvedCusts.filter(c => !c.createdBy || c.createdBy === 'admin');
+
+        // SuperAdmin restricts reminders to those created by 'admin' (their own) and recruitment (exclusive to Admin)
+        resolvedRems = resolvedRems.filter(r => {
+          if (r.targetType === 'recruitment') return true;
+          if (r.targetType === 'renewal') {
+            const tgtPol = resolvedPols.find(p => p.id === r.targetId);
+            return tgtPol && (!tgtPol.createdBy || tgtPol.createdBy === 'admin');
+          }
+          const tgtCust = resolvedCusts.find(c => c.id === r.targetId);
+          return tgtCust && (!tgtCust.createdBy || tgtCust.createdBy === 'admin');
+        });
+      }
+
       resolvedCusts.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
       setCustomers(resolvedCusts);
 
@@ -133,29 +174,68 @@ export function AppProvider({ children }) {
     }
   }, []);
 
-  // Sync state from server once on load
+  // Sync state from server once on load and run background interval every 6 seconds to update automatically
   useEffect(() => {
     loadStateFromServer();
+
+    const interval = setInterval(() => {
+      loadStateFromServer();
+    }, 6000);
+
+    return () => clearInterval(interval);
   }, [loadStateFromServer]);
 
   // Authentication handlers (Standard login logic)
-  const login = (username, password) => {
-    const trimmedUser = username.trim();
-    if (trimmedUser === 'admin' && password === 'admin@aynakaran') {
-      setIsAuthenticated(true);
-      setAdminUser(trimmedUser);
-      localStorage.setItem('aynakaran_auth', 'true');
-      localStorage.setItem('aynakaran_user', trimmedUser);
-      return { success: true };
+  const login = async (username, password) => {
+    try {
+      const response = await apiService.loginUser(username, password);
+      if (response && response.success) {
+        const loggedUser = response.user;
+        setIsServerLoaded(false);
+        setIsAuthenticated(true);
+        setAdminUser(loggedUser.username);
+        setUserRole(loggedUser.role);
+        
+        localStorage.setItem('aynakaran_auth', 'true');
+        localStorage.setItem('aynakaran_user', loggedUser.username);
+        localStorage.setItem('aynakaran_role', loggedUser.role);
+
+        // Fetch user matching datasets
+        setTimeout(() => {
+          loadStateFromServer();
+        }, 100);
+
+        return { success: true };
+      } else {
+        return { success: false, error: response.error || 'Authentication error.' };
+      }
+    } catch (error) {
+      console.error('[Login Error]', error);
+      return { success: false, error: error.message || 'Invalid Username or Password!' };
     }
-    return { success: false, error: 'Invalid Administrator token or passcode credentials.' };
   };
 
-  const logout = () => {
+  const logout = async () => {
+    setIsServerLoaded(false);
+    try {
+      if (adminUser) {
+        await apiService.logoutUser(adminUser);
+      }
+    } catch (e) {
+      console.error('[API Logout Error]', e);
+    }
     setIsAuthenticated(false);
     setAdminUser('admin');
+    setUserRole('SuperAdmin');
     localStorage.removeItem('aynakaran_auth');
     localStorage.removeItem('aynakaran_user');
+    localStorage.removeItem('aynakaran_role');
+    
+    // Clear active in-memory state so it resets instantly
+    setCustomers([]);
+    setCandidates([]);
+    setPolicies([]);
+    setReminders([]);
   };
 
   // --- ACTIONS: CUSTOMER CRM SYSTEM ---
@@ -164,7 +244,8 @@ export function AppProvider({ children }) {
     const newCust = {
       ...cust,
       id: custId,
-      createdAt: cust.createdAt || new Date().toISOString()
+      createdAt: cust.createdAt || new Date().toISOString(),
+      createdBy: adminUser
     };
 
     // Optimistic frontend update
@@ -176,6 +257,7 @@ export function AppProvider({ children }) {
         setIsOnline(true);
         // Sync back standard verified entity
         setCustomers(prev => prev.map(c => c.id === custId ? { ...newCust, ...created.data } : c));
+        loadStateFromServer();
         return { ...newCust, ...created.data };
       }
     } catch (err) {
@@ -185,23 +267,32 @@ export function AppProvider({ children }) {
   };
 
   const updateCustomer = async (id, updatedFields) => {
-    setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...updatedFields } : c));
+    const payload = { ...updatedFields, updatedBy: adminUser };
+    setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...payload } : c));
 
     try {
-      await apiService.updateCustomer(id, updatedFields);
+      await apiService.updateCustomer(id, payload);
       setIsOnline(true);
+      loadStateFromServer();
     } catch (err) {
       console.error('[API Update Customer Error]', err);
     }
   };
 
-  const deleteCustomer = async (id) => {
-    setCustomers(prev => prev.filter(c => c.id !== id));
+  const deleteCustomer = async (id, otp) => {
     try {
-      await apiService.deleteCustomer(id);
-      setIsOnline(true);
+      const response = await apiService.deleteCustomer(id, userRole, adminUser, otp);
+      if (response && response.success !== false) {
+        setCustomers(prev => prev.filter(c => c.id !== id));
+        setIsOnline(true);
+        loadStateFromServer();
+        return { success: true };
+      } else {
+        return { success: false, error: response.error || 'Failed to delete customer' };
+      }
     } catch (err) {
       console.error('[API Delete Customer Error]', err);
+      return { success: false, error: err.message || 'Deletion error' };
     }
   };
 
@@ -222,6 +313,7 @@ export function AppProvider({ children }) {
       if (created) {
         setIsOnline(true);
         setCandidates(prev => prev.map(c => c.id === candId ? { ...newCand, ...created.data } : c));
+        loadStateFromServer();
         return { ...newCand, ...created.data };
       }
     } catch (err) {
@@ -236,6 +328,7 @@ export function AppProvider({ children }) {
     try {
       await apiService.updateCandidate(id, updatedFields);
       setIsOnline(true);
+      loadStateFromServer();
     } catch (err) {
       console.error('[API Update Candidate Error]', err);
     }
@@ -246,6 +339,7 @@ export function AppProvider({ children }) {
     try {
       await apiService.deleteCandidate(id);
       setIsOnline(true);
+      loadStateFromServer();
     } catch (err) {
       console.error('[API Delete Candidate Error]', err);
     }
@@ -258,7 +352,8 @@ export function AppProvider({ children }) {
       ...policy,
       id: polId,
       pendingStageSince: policy.pendingStageSince || new Date().toISOString().split('T')[0],
-      createdAt: policy.createdAt || new Date().toISOString()
+      createdAt: policy.createdAt || new Date().toISOString(),
+      createdBy: adminUser
     };
 
     setPolicies(prev => [newPolicy, ...prev]);
@@ -268,6 +363,7 @@ export function AppProvider({ children }) {
       if (created) {
         setIsOnline(true);
         setPolicies(prev => prev.map(p => p.id === polId ? { ...newPolicy, ...created.data } : p));
+        loadStateFromServer();
         return { ...newPolicy, ...created.data };
       }
     } catch (err) {
@@ -277,9 +373,10 @@ export function AppProvider({ children }) {
   };
 
   const updatePolicy = async (id, updatedFields) => {
-    setPolicies(prev => prev.map(p => p.id === id ? { ...p, ...updatedFields } : p));
+    const payload = { ...updatedFields, updatedBy: adminUser };
+    setPolicies(prev => prev.map(p => p.id === id ? { ...p, ...payload } : p));
     try {
-      await apiService.updatePolicy(id, updatedFields);
+      await apiService.updatePolicy(id, payload);
       setIsOnline(true);
       loadStateFromServer();
     } catch (err) {
@@ -287,13 +384,20 @@ export function AppProvider({ children }) {
     }
   };
 
-  const deletePolicy = async (id) => {
-    setPolicies(prev => prev.filter(p => p.id !== id));
+  const deletePolicy = async (id, otp) => {
     try {
-      await apiService.deletePolicy(id);
-      setIsOnline(true);
+      const response = await apiService.deletePolicy(id, userRole, adminUser, otp);
+      if (response && response.success !== false) {
+        setPolicies(prev => prev.filter(p => p.id !== id));
+        setIsOnline(true);
+        loadStateFromServer();
+        return { success: true };
+      } else {
+        return { success: false, error: response.error || 'Failed to delete policy' };
+      }
     } catch (err) {
       console.error('[API Delete Policy Error]', err);
+      return { success: false, error: err.message || 'Deletion error' };
     }
   };
 
@@ -347,7 +451,27 @@ export function AppProvider({ children }) {
     try {
       const res = await apiService.triggerCronScan();
       if (res && res.reminders) {
-        setReminders(res.reminders);
+        let resolved = res.reminders;
+        if (userRole === 'Staff' && adminUser) {
+          resolved = resolved.filter(r => {
+            if (r.targetType === 'recruitment') return false;
+            if (r.targetType === 'renewal') {
+              return policies.some(p => p.id === r.targetId);
+            }
+            return customers.some(c => c.id === r.targetId);
+          });
+        } else {
+          resolved = resolved.filter(r => {
+            if (r.targetType === 'recruitment') return true;
+            if (r.targetType === 'renewal') {
+              const tgtPol = policies.find(p => p.id === r.targetId);
+              return tgtPol && (!tgtPol.createdBy || tgtPol.createdBy === 'admin');
+            }
+            const tgtCust = customers.find(c => c.id === r.targetId);
+            return tgtCust && (!tgtCust.createdBy || tgtCust.createdBy === 'admin');
+          });
+        }
+        setReminders(resolved);
       }
       setIsOnline(true);
       return res;
@@ -360,6 +484,7 @@ export function AppProvider({ children }) {
     <AppContext.Provider value={{
       isAuthenticated,
       adminUser,
+      userRole,
       activeTab,
       setActiveTab,
       customers,
