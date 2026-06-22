@@ -287,9 +287,14 @@ export function AppProvider({ children }) {
     try {
       const response = await apiService.deleteCustomer(id, userRole, adminUser, otp);
       if (response && response.success !== false) {
+        // Update local storage synchronously first to avoid race condition during server state reload
+        const username = adminUser || 'admin';
+        const cachedCusts = JSON.parse(localStorage.getItem(`ayn_customers_${username}`) || '[]');
+        localStorage.setItem(`ayn_customers_${username}`, JSON.stringify(cachedCusts.filter(c => c.id !== id)));
+
         setCustomers(prev => prev.filter(c => c.id !== id));
         setIsOnline(true);
-        loadStateFromServer();
+        await loadStateFromServer();
         return { success: true };
       } else {
         return { success: false, error: response.error || 'Failed to delete customer' };
@@ -339,11 +344,16 @@ export function AppProvider({ children }) {
   };
 
   const deleteCandidate = async (id) => {
+    // Update local storage synchronously first to avoid race condition during server state reload
+    const username = adminUser || 'admin';
+    const cachedCands = JSON.parse(localStorage.getItem(`ayn_candidates_${username}`) || '[]');
+    localStorage.setItem(`ayn_candidates_${username}`, JSON.stringify(cachedCands.filter(c => c.id !== id)));
+
     setCandidates(prev => prev.filter(c => c.id !== id));
     try {
       await apiService.deleteCandidate(id);
       setIsOnline(true);
-      loadStateFromServer();
+      await loadStateFromServer();
     } catch (err) {
       console.error('[API Delete Candidate Error]', err);
     }
@@ -392,9 +402,14 @@ export function AppProvider({ children }) {
     try {
       const response = await apiService.deletePolicy(id, userRole, adminUser, otp);
       if (response && response.success !== false) {
+        // Update local storage synchronously first to avoid race condition during server state reload
+        const username = adminUser || 'admin';
+        const cachedPols = JSON.parse(localStorage.getItem(`ayn_policies_${username}`) || '[]');
+        localStorage.setItem(`ayn_policies_${username}`, JSON.stringify(cachedPols.filter(p => p.id !== id)));
+
         setPolicies(prev => prev.filter(p => p.id !== id));
         setIsOnline(true);
-        loadStateFromServer();
+        await loadStateFromServer();
         return { success: true };
       } else {
         return { success: false, error: response.error || 'Failed to delete policy' };
