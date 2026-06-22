@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Lock,
   Building2,
@@ -43,6 +43,14 @@ function MainLayout() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState(null);
+
+  // Clear credential fields when signed out / unauthenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setUsername('');
+      setPassword('');
+    }
+  }, [isAuthenticated]);
 
   // Handle Login Authentication
   const handleAdminSignIn = async (e) => {
