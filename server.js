@@ -1089,27 +1089,27 @@ Aynkaran Business CRM Autopilot`;
     const { customers, candidates, policies, reminders } = req.body;
     if (mongoDbConnection) {
       try {
-        if (Array.isArray(customers)) {
-          await mongoDbConnection.collection('customers').deleteMany({});
-          if (customers.length > 0) {
+        if (Array.isArray(customers) && customers.length > 0) {
+          const count = await mongoDbConnection.collection('customers').countDocuments();
+          if (count === 0) {
             await mongoDbConnection.collection('customers').insertMany(customers);
           }
         }
-        if (Array.isArray(candidates)) {
-          await mongoDbConnection.collection('candidates').deleteMany({});
-          if (candidates.length > 0) {
+        if (Array.isArray(candidates) && candidates.length > 0) {
+          const count = await mongoDbConnection.collection('candidates').countDocuments();
+          if (count === 0) {
             await mongoDbConnection.collection('candidates').insertMany(candidates);
           }
         }
-        if (Array.isArray(policies)) {
-          await mongoDbConnection.collection('policies').deleteMany({});
-          if (policies.length > 0) {
+        if (Array.isArray(policies) && policies.length > 0) {
+          const count = await mongoDbConnection.collection('policies').countDocuments();
+          if (count === 0) {
             await mongoDbConnection.collection('policies').insertMany(policies);
           }
         }
-        if (Array.isArray(reminders)) {
-          await mongoDbConnection.collection('reminders').deleteMany({});
-          if (reminders.length > 0) {
+        if (Array.isArray(reminders) && reminders.length > 0) {
+          const count = await mongoDbConnection.collection('reminders').countDocuments();
+          if (count === 0) {
             await mongoDbConnection.collection('reminders').insertMany(reminders);
           }
         }
@@ -1118,11 +1118,26 @@ Aynkaran Business CRM Autopilot`;
         res.status(500).json({ error: err.message });
       }
     } else {
-      if (Array.isArray(customers)) db.customers = customers;
-      if (Array.isArray(candidates)) db.candidates = candidates;
-      if (Array.isArray(policies)) db.policies = policies;
-      if (Array.isArray(reminders)) db.reminders = reminders;
-      saveDatabase(db);
+      let changed = false;
+      if (Array.isArray(customers) && customers.length > 0 && (!db.customers || db.customers.length === 0)) {
+        db.customers = customers;
+        changed = true;
+      }
+      if (Array.isArray(candidates) && candidates.length > 0 && (!db.candidates || db.candidates.length === 0)) {
+        db.candidates = candidates;
+        changed = true;
+      }
+      if (Array.isArray(policies) && policies.length > 0 && (!db.policies || db.policies.length === 0)) {
+        db.policies = policies;
+        changed = true;
+      }
+      if (Array.isArray(reminders) && reminders.length > 0 && (!db.reminders || db.reminders.length === 0)) {
+        db.reminders = reminders;
+        changed = true;
+      }
+      if (changed) {
+        saveDatabase(db);
+      }
       res.json({ success: true, timestamp: new Date().toISOString() });
     }
   });

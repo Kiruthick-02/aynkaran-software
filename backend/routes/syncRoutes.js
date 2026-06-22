@@ -12,30 +12,30 @@ export function syncRoutes(db) {
     try {
       const { customers, candidates, policies, reminders } = req.body;
 
-      if (Array.isArray(customers)) {
-        await db.collection('customers').deleteMany({});
-        if (customers.length > 0) {
+      if (Array.isArray(customers) && customers.length > 0) {
+        const count = await db.collection('customers').countDocuments();
+        if (count === 0) {
           await db.collection('customers').insertMany(customers);
         }
       }
 
-      if (Array.isArray(candidates)) {
-        await db.collection('candidates').deleteMany({});
-        if (candidates.length > 0) {
+      if (Array.isArray(candidates) && candidates.length > 0) {
+        const count = await db.collection('candidates').countDocuments();
+        if (count === 0) {
           await db.collection('candidates').insertMany(candidates);
         }
       }
 
-      if (Array.isArray(policies)) {
-        await db.collection('policies').deleteMany({});
-        if (policies.length > 0) {
+      if (Array.isArray(policies) && policies.length > 0) {
+        const count = await db.collection('policies').countDocuments();
+        if (count === 0) {
           await db.collection('policies').insertMany(policies);
         }
       }
 
-      if (Array.isArray(reminders)) {
-        await db.collection('reminders').deleteMany({});
-        if (reminders.length > 0) {
+      if (Array.isArray(reminders) && reminders.length > 0) {
+        const count = await db.collection('reminders').countDocuments();
+        if (count === 0) {
           await db.collection('reminders').insertMany(reminders);
         }
       }

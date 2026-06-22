@@ -127,7 +127,7 @@ export default function Documents({ candidates = [], customers = [] }) {
   const fullDocumentsPool = [...corporateDocs, ...candidateDocs, ...customerDocs];
 
   const filtered = fullDocumentsPool.filter((doc) => {
-    const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase()) || doc.sourceName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (doc.name || '').toLowerCase().includes((searchQuery || '').toLowerCase()) || (doc.sourceName || '').toLowerCase().includes((searchQuery || '').toLowerCase());
     let matchesCategory = false;
     if (selectedCategory === 'all') {
       matchesCategory = true;

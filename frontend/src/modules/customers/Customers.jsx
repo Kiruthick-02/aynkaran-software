@@ -352,10 +352,10 @@ export default function Customers({ customers = [], addCustomer, updateCustomer,
 
   const filteredCustomers = customers.filter(
     (c) =>
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.mobileNumber.includes(searchQuery) ||
-      c.emailId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.id.toLowerCase().includes(searchQuery.toLowerCase())
+      (c.name || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+      (c.mobileNumber || '').includes(searchQuery || '') ||
+      (c.emailId || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+      (c.id || '').toLowerCase().includes((searchQuery || '').toLowerCase())
   );
 
   const handleCreateCustomer = (e) => {
