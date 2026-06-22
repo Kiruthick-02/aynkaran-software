@@ -38,7 +38,7 @@ export class AuthController {
       }
 
       // Default fallback local desktop root administrator
-      if (username === 'admin' && password === 'admin123') {
+      if (username === 'admin' && password === 'admin@aynkaran') {
         const token = jwt.sign(
           { id: 'usr-admin', username: 'admin', role: 'SuperAdmin' },
           JWT_SECRET,
