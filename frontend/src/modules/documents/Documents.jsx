@@ -29,7 +29,7 @@ const cleanFileName = (filePathOrName) => {
 };
 
 export default function Documents({ candidates = [], customers = [] }) {
-  const { updateCandidate, updateCustomer } = useApp();
+  const { updateCandidate, updateCustomer, userRole } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedVaultOwner, setSelectedVaultOwner] = useState(null);
@@ -61,7 +61,7 @@ export default function Documents({ candidates = [], customers = [] }) {
     }
   };
 
-  const candidateDocs = candidates.flatMap((c) =>
+  const candidateDocs = userRole === 'Staff' ? [] : candidates.flatMap((c) =>
     (c.documents || []).map((doc) => ({
       id: doc.id,
       candidateId: c.id,
@@ -149,7 +149,7 @@ export default function Documents({ candidates = [], customers = [] }) {
   });
 
   const owners = [
-      ...candidates.map(c => ({ id: c.id, name: c.name, type: 'Agent', photo: c.profilePicture })),
+      ...(userRole === 'Staff' ? [] : candidates.map(c => ({ id: c.id, name: c.name, type: 'Agent', photo: c.profilePicture }))),
       ...customers.map(c => ({ id: c.id, name: c.name, type: 'Customer', photo: c.kycDocuments?.passportSizePhoto }))
     ];
 
@@ -233,38 +233,42 @@ export default function Documents({ candidates = [], customers = [] }) {
                 </div>
              </div>
 
-             <hr className="border-slate-100" />
+             {userRole !== 'Staff' && (
+               <>
+                 <hr className="border-slate-100" />
 
-             <div className="space-y-2">
-                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Agents</h4>
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-                  {agentOwners.map(owner => (
-                    <button
-                      key={owner.id}
-                      onClick={() => setSelectedVaultOwner(owner.id)}
-                      className={`flex items-center space-x-2 px-3 py-1.5 rounded-full border transition-all shrink-0 ${
-                        selectedVaultOwner === owner.id
-                          ? 'bg-indigo-50 border-indigo-400 text-indigo-700 ring-2 ring-indigo-500/10 font-bold'
-                          : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
-                      }`}
-                      title={owner.name}
-                    >
-                      <div className="w-6 h-6 rounded-full overflow-hidden bg-white border border-slate-200/80 shrink-0">
-                          <img
-                              src={owner.photo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(owner.name)}`}
-                              alt={owner.name}
-                              className="w-full h-full object-cover"
-                              referrerPolicy="no-referrer"
-                          />
-                      </div>
-                      <span className="text-[11px] truncate max-w-[90px]">{owner.name}</span>
-                    </button>
-                  ))}
-                  {agentOwners.length === 0 && (
-                     <span className="text-[11px] text-slate-400 italic">No agents registered.</span>
-                  )}
-                </div>
-             </div>
+                 <div className="space-y-2">
+                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Agents</h4>
+                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+                      {agentOwners.map(owner => (
+                        <button
+                          key={owner.id}
+                          onClick={() => setSelectedVaultOwner(owner.id)}
+                          className={`flex items-center space-x-2 px-3 py-1.5 rounded-full border transition-all shrink-0 ${
+                            selectedVaultOwner === owner.id
+                              ? 'bg-indigo-50 border-indigo-400 text-indigo-700 ring-2 ring-indigo-500/10 font-bold'
+                              : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                          }`}
+                          title={owner.name}
+                        >
+                          <div className="w-6 h-6 rounded-full overflow-hidden bg-white border border-slate-200/80 shrink-0">
+                              <img
+                                  src={owner.photo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(owner.name)}`}
+                                  alt={owner.name}
+                                  className="w-full h-full object-cover"
+                                  referrerPolicy="no-referrer"
+                              />
+                          </div>
+                          <span className="text-[11px] truncate max-w-[90px]">{owner.name}</span>
+                        </button>
+                      ))}
+                      {agentOwners.length === 0 && (
+                         <span className="text-[11px] text-slate-400 italic">No agents registered.</span>
+                      )}
+                    </div>
+                 </div>
+               </>
+             )}
           </div>
         </div>
 
@@ -290,7 +294,7 @@ export default function Documents({ candidates = [], customers = [] }) {
             >
               <option value="all">-- All Documents --</option>
               <option value="Customer">Customer KYC Documents Only</option>
-              <option value="Candidate">Candidate Training Documents Only</option>
+              {userRole !== 'Staff' && <option value="Candidate">Candidate Training Documents Only</option>}
               <option value="Aadhaar">Aadhaar Card copy</option>
               <option value="PAN">PAN Card copy</option>
               <option value="photo">Passport Size Photo</option>

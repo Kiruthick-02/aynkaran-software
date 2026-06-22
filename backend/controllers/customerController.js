@@ -11,8 +11,9 @@ export class CustomerController {
 
   getAll = async (req, res) => {
     try {
+      const { role, username } = req.query;
       const rows = await this.db.collection('customers').find().sort({ createdAt: -1 }).toArray();
-      const formatted = rows.map(r => ({
+      let formatted = rows.map(r => ({
         ...r,
         id: r.id || r._id.toString(),
         _id: undefined,
@@ -21,6 +22,15 @@ export class CustomerController {
         nominee: typeof r.nominee === 'string' ? JSON.parse(r.nominee || '{}') : (r.nominee || {}),
         work: typeof r.work === 'string' ? JSON.parse(r.work || '{}') : (r.work || {}),
       }));
+
+      if (role === 'Staff' && username) {
+        formatted = formatted.filter(c => c.createdBy === username);
+      } else if (req.query.all === 'true' || req.query.supervise === 'true') {
+        // Return unfiltered portfolios for supervision
+      } else {
+        formatted = formatted.filter(c => !c.createdBy || c.createdBy === 'admin');
+      }
+
       res.json(formatted);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -64,6 +74,21 @@ export class CustomerController {
   delete = async (req, res) => {
     try {
       const { id } = req.params;
+      const { role, username, otp } = req.query;
+
+      if (role === 'Staff' && username) {
+        if (!otp) {
+          return res.status(403).json({ error: 'Authorizing OTP is required for Staff delete operations.' });
+        }
+
+        const activeOtpRecord = await this.db.collection('otps').findOne({ username });
+        if (!activeOtpRecord || activeOtpRecord.otp !== otp || activeOtpRecord.targetId !== id) {
+          return res.status(400).json({ error: 'Invalid or expired OTP code. Clear aborted.' });
+        }
+
+        await this.db.collection('otps').deleteOne({ username });
+      }
+
       await this.db.collection('customers').deleteOne({ id });
       res.json({ success: true, message: 'Customer profile cleared securely.' });
     } catch (e) {

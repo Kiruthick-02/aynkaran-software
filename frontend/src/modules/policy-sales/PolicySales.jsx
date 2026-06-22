@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useApp } from '../../context/AppContext';
+import { apiService } from '../../services/api';
 import {
   FileText,
   TrendingUp,
@@ -12,6 +14,7 @@ import {
   Calculator,
   User,
   AlertCircle,
+  Lock,
 } from 'lucide-react';
 
 export const POLICY_STAGES = [
@@ -25,6 +28,13 @@ export const POLICY_STAGES = [
 ];
 
 export default function PolicySales({ policies = [], addPolicy, updatePolicy, deletePolicy, customers = [] }) {
+  const { userRole, adminUser } = useApp();
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpTargetId, setOtpTargetId] = useState(null);
+  const [enteredOtp, setEnteredOtp] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+
   const [selectedLead, setSelectedLead] = useState(null);
   const [isAddingLead, setIsAddingLead] = useState(false);
   const [renewalSuccessMsg, setRenewalSuccessMsg] = useState('');
@@ -161,9 +171,57 @@ export default function PolicySales({ policies = [], addPolicy, updatePolicy, de
   };
 
   const handleDeleteLead = (id) => {
-    if (confirm('Delete this policy sale item?')) {
-      deletePolicy(id);
-      setSelectedLead(null);
+    const policy = policies.find(p => p.id === id);
+    const pName = policy ? `${policy.policyType} Lead` : 'Unknown Policy';
+
+    if (userRole === 'Staff') {
+      if (confirm('Authorization Secure Protocol: Staff accounts are prevented from unilateral deletes. Verify deletion with Superadmin OTP?')) {
+        setOtpTargetId(id);
+        setShowOtpModal(true);
+        setEnteredOtp('');
+        setOtpError('');
+        setOtpLoading(true);
+
+        apiService.requestDeleteOTP(adminUser, id, 'Policy', pName)
+          .then(res => {
+            if (res && res.success) {
+              // Successfully sent OTP
+            } else {
+              setOtpError(res.error || 'Failed to trigger secure OTP.');
+            }
+          })
+          .catch(err => setOtpError(err.message || 'Error executing OTP request.'))
+          .finally(() => setOtpLoading(false));
+      }
+    } else {
+      if (confirm('Delete this policy sale item?')) {
+        deletePolicy(id);
+        setSelectedLead(null);
+      }
+    }
+  };
+
+  const handleVerifyOtpDeletePolicy = async () => {
+    if (!enteredOtp.trim()) {
+      setOtpError('Please input verification passcode.');
+      return;
+    }
+    setOtpLoading(true);
+    setOtpError('');
+    try {
+      const response = await deletePolicy(otpTargetId, enteredOtp);
+      if (response && response.success) {
+        setShowOtpModal(false);
+        setEnteredOtp('');
+        setSelectedLead(null);
+        alert('Operation Verified! Policy record has been deleted safely.');
+      } else {
+        setOtpError(response.error || 'Incorrect passcode! Operation forbidden by Superadmin.');
+      }
+    } catch (err) {
+      setOtpError(err.message || 'Error occurred during deletion lock validation.');
+    } finally {
+      setOtpLoading(false);
     }
   };
 
@@ -595,6 +653,75 @@ export default function PolicySales({ policies = [], addPolicy, updatePolicy, de
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Superadmin OTP Verification Modal Overlay */}
+      {showOtpModal && (
+        <div className="fixed inset-0 z-50 bg-[#0F172A]/70 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-100 w-full max-w-md p-6 rounded-3xl shadow-2xl relative space-y-5">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+              <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <Lock size={18} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">OTP Deletion Lock</h3>
+                <p className="text-[11px] text-slate-400">Security Approval Verification</p>
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-600 leading-relaxed space-y-3">
+              <p>
+                Deleting records requires Superadmin authorization context. A one-time verification passcode (OTP) has been queued to Superadmin registered coordinate email: **kiruthickrn@gmail.com**.
+              </p>
+
+              {otpLoading && (
+                <div className="py-2 flex items-center gap-2 text-indigo-600 text-[11px] font-bold">
+                  <span className="w-2.5 h-2.5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></span>
+                  <span>Generating securely...</span>
+                </div>
+              )}
+
+              {otpError && (
+                <p className="text-xs text-rose-600 font-semibold bg-rose-50 p-2.5 rounded-xl block">
+                  {otpError}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <input
+                type="text"
+                placeholder="Enter 6-digit OTP passcode"
+                maxLength={6}
+                value={enteredOtp}
+                onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, ''))}
+                className="w-full text-center py-3 bg-slate-50 border border-slate-200 text-slate-800 text-sm font-bold tracking-widest rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowOtpModal(false);
+                    setEnteredOtp('');
+                    setOtpError('');
+                  }}
+                  className="flex-1 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleVerifyOtpDeletePolicy}
+                  disabled={otpLoading}
+                  className="flex-1 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-xl transition cursor-pointer shadow-md shadow-indigo-100"
+                >
+                  Confirm Delete
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

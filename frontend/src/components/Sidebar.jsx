@@ -1,4 +1,5 @@
 import React from 'react';
+import { useApp } from '../context/AppContext';
 import {
   LayoutDashboard,
   UserPlus,
@@ -8,19 +9,24 @@ import {
   FolderClosed,
   Download,
   RefreshCw,
-  LogOut
+  LogOut,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function Sidebar({ activeTab, setActiveTab, onLogout, adminUsername }) {
+  const { userRole } = useApp();
+
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'recruitment', label: 'Recruitment (Agents)', icon: UserPlus },
+    ...(userRole === 'SuperAdmin' ? [
+      { id: 'recruitment', label: 'Recruitment (Agents)', icon: UserPlus },
+      { id: 'staff_management', label: 'Staff Supervision', icon: ShieldCheck }
+    ] : []),
     { id: 'policies', label: 'Policy Sales', icon: FileText },
     { id: 'customers', label: 'Customer CRM', icon: Users },
     { id: 'reminders', label: 'Reminders Console', icon: Bell },
     { id: 'documents', label: 'Document Vault', icon: FolderClosed },
     { id: 'reports', label: 'Export & Reports', icon: Download },
-    { id: 'updates', label: 'Software Updates', icon: RefreshCw },
   ];
 
   return (

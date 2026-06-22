@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { compressImageToBase64, dataURLtoFile } from '../../utils/imageCompressor';
 import API_URL from '../../config/api';
 import { apiService } from '../../services/api';
@@ -19,64 +19,176 @@ import {
   Calendar,
   Download,
   Eye,
+  Lock,
 } from 'lucide-react';
 
 /**
  * Hybrid Date Input component allowing both manual typing and native calendar selection
  */
-function DualDateInput({ value, onChange, placeholder = "YYYY-MM-DD", required = false }) {
-  const dateRef = useRef(null);
+/**
+ * Hybrid Date Input component allowing both manual typing and highly convenient, instant dropdown picker
+ */
+function DualDateInput({ value, onChange, placeholder = "DD/MM/YYYY", required = false }) {
+  const [showPopup, setShowPopup] = useState(false);
+  const containerRef = useRef(null);
 
-  const handleTextChange = (e) => {
-    onChange(e.target.value);
-  };
+  // Parse DD/MM/YYYY
+  const parts = (value || "").split('/');
+  const currentDay = parts[0] || "";
+  const currentMonth = parts[1] || "";
+  const currentYear = parts[2] || "";
 
-  const handleDateChange = (e) => {
-    onChange(e.target.value);
-  };
+  // Days list
+  const days = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0'));
 
-  const triggerCalendar = () => {
-    if (dateRef.current) {
-      try {
-        dateRef.current.showPicker();
-      } catch (err) {
-        dateRef.current.click();
+  // Months list
+  const months = [
+    { val: '01', label: 'Jan (01)' },
+    { val: '02', label: 'Feb (02)' },
+    { val: '03', label: 'Mar (03)' },
+    { val: '04', label: 'Apr (04)' },
+    { val: '05', label: 'May (05)' },
+    { val: '06', label: 'Jun (06)' },
+    { val: '07', label: 'Jul (07)' },
+    { val: '08', label: 'Aug (08)' },
+    { val: '09', label: 'Sep (09)' },
+    { val: '10', label: 'Oct (10)' },
+    { val: '11', label: 'Nov (11)' },
+    { val: '12', label: 'Dec (12)' },
+  ];
+
+  // Year list: current year down to 1910
+  const endYear = new Date().getFullYear();
+  const startYear = 1910;
+  const years = [];
+  for (let y = endYear; y >= startYear; y--) {
+    years.push(String(y));
+  }
+
+  // Handle outside clicks to close the popover
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setShowPopup(false);
       }
     }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const handleTextChange = (e) => {
+    // Only allow numbers and slashes
+    const cleaned = e.target.value.replace(/[^0-9/]/g, '');
+    onChange(cleaned);
   };
 
-  // Check if string matches YYYY-MM-DD standard format for the calendar picker binding
-  const isStandardDate = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const handleSelectChange = (field, val) => {
+    let d = currentDay;
+    let m = currentMonth;
+    let y = currentYear;
+
+    if (field === 'day') d = val;
+    if (field === 'month') m = val;
+    if (field === 'year') y = val;
+
+    // Default to '01' if empty and we set another field
+    if (!d) d = '01';
+    if (!m) m = '01';
+    if (!y) y = String(new Date().getFullYear() - 25); // reasonable default for DOB if empty
+
+    onChange(`${d}/${m}/${y}`);
+  };
 
   return (
-    <div className="flex gap-2 items-center w-full">
+    <div ref={containerRef} className="relative flex gap-2 items-center w-full">
       <input
         required={required}
         type="text"
         placeholder={placeholder}
         value={value}
         onChange={handleTextChange}
-        className="flex-1 bg-slate-50 border border-slate-300 rounded-xl p-2 text-slate-800 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
-        title="Type manually (e.g. YYYY-MM-DD or DD-MM-YYYY)"
+        maxLength={10}
+        className="flex-1 bg-slate-50 border border-slate-300 rounded-xl p-2 text-slate-800 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
+        title="Type manually (format: DD/MM/YYYY)"
       />
-      
-      <div className="relative shrink-0">
-        <button
-          type="button"
-          onClick={triggerCalendar}
-          className="p-2.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-600 rounded-xl flex items-center justify-center cursor-pointer transition-colors shadow-sm"
-          title="Choose date from calendar"
-        >
-          <Calendar size={14} />
-        </button>
-        <input
-          ref={dateRef}
-          type="date"
-          value={isStandardDate ? value : ""}
-          onChange={handleDateChange}
-          className="absolute inset-0 opacity-0 pointer-events-none w-0 h-0"
-        />
-      </div>
+
+      <button
+        type="button"
+        onClick={() => setShowPopup(!showPopup)}
+        className="p-2.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-600 rounded-xl flex items-center justify-center cursor-pointer transition-colors shadow-sm"
+        title="Open Convenient DOB Selector"
+      >
+        <Calendar size={14} />
+      </button>
+
+      {showPopup && (
+        <div className="absolute right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 z-40 w-72 animate-in fade-in slide-in-from-top-2 duration-150 space-y-3">
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center">
+            Quick DOB Selector
+          </div>
+
+          <div className="grid grid-cols-3 gap-1.5 font-sans">
+            <div>
+              <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 text-center">Year</label>
+              <select
+                value={currentYear}
+                onChange={(e) => handleSelectChange('year', e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1 text-xs text-slate-800 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 h-9"
+              >
+                <option value="">Year</option>
+                {years.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 text-center">Month</label>
+              <select
+                value={currentMonth}
+                onChange={(e) => handleSelectChange('month', e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1 text-xs text-slate-800 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 h-9"
+              >
+                <option value="">Month</option>
+                {months.map(m => (
+                  <option key={m.val} value={m.val}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 text-center">Day</label>
+              <select
+                value={currentDay}
+                onChange={(e) => handleSelectChange('day', e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1 text-xs text-slate-800 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 h-9"
+              >
+                <option value="">Day</option>
+                {days.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
+            <span className="text-slate-500 font-medium">Selected Date:</span>
+            <span className="font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+              {value || '--/--/----'}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowPopup(false)}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-1.5 text-xs font-bold transition cursor-pointer text-center block"
+          >
+            Apply & Close
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -96,7 +208,7 @@ const cleanFileName = (filePathOrName) => {
 };
 
 export default function Customers({ customers = [], addCustomer, updateCustomer, deleteCustomer, policies = [] }) {
-  const { loadStateFromServer, candidates } = useApp();
+  const { loadStateFromServer, candidates, userRole, adminUser } = useApp();
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
@@ -348,12 +460,70 @@ export default function Customers({ customers = [], addCustomer, updateCustomer,
     setDocFileVal('');
   };
 
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpTargetId, setOtpTargetId] = useState(null);
+  const [enteredOtp, setEnteredOtp] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+
   const handleDeleteCustomer = (id) => {
-    if (confirm('Are you sure you want to permanently delete this customer profile? Linked sales history will lose CRM anchors.')) {
-      deleteCustomer(id);
-      if (selectedCustomerId === id) {
-        setSelectedCustomerId(customers[0]?.id || null);
+    const cust = customers.find(c => c.id === id);
+    const cName = cust ? cust.name : 'Unknown Customer';
+    
+    if (userRole === 'Staff') {
+      if (confirm('Authorization Secure Protocol: Staff accounts are prevented from unilateral deletes. Verify deletion with Superadmin OTP?')) {
+        setOtpTargetId(id);
+        setShowOtpModal(true);
+        setEnteredOtp('');
+        setOtpError('');
+        setOtpLoading(true);
+        
+        apiService.requestDeleteOTP(adminUser, id, 'Customer', cName)
+          .then(res => {
+            if (res && res.success) {
+              // Successfully sent OTP
+            } else {
+              setOtpError(res.error || 'Failed to trigger secure OTP.');
+            }
+          })
+          .catch(err => setOtpError(err.message || 'Error executing OTP request.'))
+          .finally(() => setOtpLoading(false));
       }
+    } else {
+      if (confirm('Are you sure you want to permanently delete this customer profile? Linked sales history will lose CRM anchors.')) {
+        deleteCustomer(id);
+        if (selectedCustomerId === id) {
+          const remaining = customers.filter(c => c.id !== id);
+          setSelectedCustomerId(remaining[0]?.id || null);
+        }
+      }
+    }
+  };
+
+  const handleVerifyOtpDelete = async () => {
+    if (!enteredOtp.trim()) {
+      setOtpError('Please input verification passcode.');
+      return;
+    }
+    setOtpLoading(true);
+    setOtpError('');
+    try {
+      const response = await deleteCustomer(otpTargetId, enteredOtp);
+      if (response && response.success) {
+        setShowOtpModal(false);
+        setEnteredOtp('');
+        if (selectedCustomerId === otpTargetId) {
+          const remaining = customers.filter(c => c.id !== otpTargetId);
+          setSelectedCustomerId(remaining[0]?.id || null);
+        }
+        alert('Operation Verified! Customer profile has been deleted safely.');
+      } else {
+        setOtpError(response.error || 'Incorrect passcode! Operation forbidden by Superadmin.');
+      }
+    } catch (err) {
+      setOtpError(err.message || 'Error occurred during deletion lock validation.');
+    } finally {
+      setOtpLoading(false);
     }
   };
 
@@ -490,11 +660,9 @@ export default function Customers({ customers = [], addCustomer, updateCustomer,
                         </div>
                         <div>
                           <label className="block text-[10px] font-bold text-slate-500 mb-0.5">DOB Date</label>
-                          <input
-                            type="date"
+                          <DualDateInput
                             value={editCustDob}
-                            onChange={(e) => setEditCustDob(e.target.value)}
-                            className="w-full bg-white border border-slate-300 rounded p-1 text-xs text-slate-800"
+                            onChange={(val) => setEditCustDob(val)}
                           />
                         </div>
                         <div>
@@ -585,40 +753,42 @@ export default function Customers({ customers = [], addCustomer, updateCustomer,
                   </p>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-100 text-xs">
-                  <span className="block text-[10px] text-slate-400 font-bold uppercase mb-1.5">Assigned Agent Coordinator of Record</span>
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 leading-snug">
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 block uppercase">Assigned Agent ID Code</span>
-                      <p className="font-extrabold text-slate-800 text-xs mt-0.5">
-                        {activeCustomer.agentCode ? (
-                          <span className="font-mono text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
-                            {activeCustomer.agentCode}
-                          </span>
-                        ) : 'No Agent Linked (Direct Office Customer)'}
-                      </p>
-                    </div>
-                    <div>
-                      <select
-                        value={activeCustomer.agentCode || ''}
-                        onChange={(e) => {
-                          console.log('[DEBUG] Assigning customer', activeCustomer.id, 'to agentCode', e.target.value);
-                          updateCustomer(activeCustomer.id, { agentCode: e.target.value });
-                        }}
-                        className="bg-white border border-slate-350 rounded-lg px-2.5 py-1.5 text-slate-705 text-xs focus:ring-1 focus:ring-indigo-500 font-medium"
-                      >
-                        <option value="">-- Direct Sale (No Agent) --</option>
-                        {(candidates || [])
-                          .filter(c => c.exam?.agentCodeGenerated)
-                          .map(c => (
-                            <option key={c.id} value={c.exam.agentCodeGenerated}>
-                              {c.name} ({c.exam.agentCodeGenerated})
-                            </option>
-                          ))}
-                      </select>
+                {userRole !== 'Staff' && (
+                  <div className="mt-4 pt-3 border-t border-slate-100 text-xs">
+                    <span className="block text-[10px] text-slate-400 font-bold uppercase mb-1.5">Assigned Agent Coordinator of Record</span>
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 leading-snug">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 block uppercase">Assigned Agent ID Code</span>
+                        <p className="font-extrabold text-slate-800 text-xs mt-0.5">
+                          {activeCustomer.agentCode ? (
+                            <span className="font-mono text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
+                              {activeCustomer.agentCode}
+                            </span>
+                          ) : 'No Agent Linked (Direct Office Customer)'}
+                        </p>
+                      </div>
+                      <div>
+                        <select
+                          value={activeCustomer.agentCode || ''}
+                          onChange={(e) => {
+                            console.log('[DEBUG] Assigning customer', activeCustomer.id, 'to agentCode', e.target.value);
+                            updateCustomer(activeCustomer.id, { agentCode: e.target.value });
+                          }}
+                          className="bg-white border border-slate-350 rounded-lg px-2.5 py-1.5 text-slate-705 text-xs focus:ring-1 focus:ring-indigo-500 font-medium"
+                        >
+                          <option value="">-- Direct Sale (No Agent) --</option>
+                          {(candidates || [])
+                            .filter(c => c.exam?.agentCodeGenerated)
+                            .map(c => (
+                              <option key={c.id} value={c.exam.agentCodeGenerated}>
+                                {c.name} ({c.exam.agentCodeGenerated})
+                              </option>
+                            ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -845,24 +1015,26 @@ export default function Customers({ customers = [], addCustomer, updateCustomer,
                   </div>
                 </div>
 
-                <div className="mt-3">
-                  <label className="block font-bold text-slate-700 mb-1">Assigned Agent (Advisor Code)</label>
-                  <select
-                    value={agentCodeField}
-                    onChange={(e) => setAgentCodeField(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-slate-800 text-xs"
-                  >
-                    <option value="">-- No Agent / Direct Sale --</option>
-                    {(candidates || [])
-                      .filter(c => c.exam?.agentCodeGenerated)
-                      .map(c => (
-                        <option key={c.id} value={c.exam.agentCodeGenerated}>
-                          {c.name} ({c.exam.agentCodeGenerated})
-                        </option>
-                      ))}
-                  </select>
-                  <p className="text-[10px] text-slate-400 mt-1">Select the recruiter/advisor who introduced this customer profile.</p>
-                </div>
+                {userRole !== 'Staff' && (
+                  <div className="mt-3">
+                    <label className="block font-bold text-slate-700 mb-1">Assigned Agent (Advisor Code)</label>
+                    <select
+                      value={agentCodeField}
+                      onChange={(e) => setAgentCodeField(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-slate-800 text-xs"
+                    >
+                      <option value="">-- No Agent / Direct Sale --</option>
+                      {(candidates || [])
+                        .filter(c => c.exam?.agentCodeGenerated)
+                        .map(c => (
+                          <option key={c.id} value={c.exam.agentCodeGenerated}>
+                            {c.name} ({c.exam.agentCodeGenerated})
+                          </option>
+                        ))}
+                    </select>
+                    <p className="text-[10px] text-slate-400 mt-1">Select the recruiter/advisor who introduced this customer profile.</p>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                   <div>
@@ -912,13 +1084,21 @@ export default function Customers({ customers = [], addCustomer, updateCustomer,
                   </div>
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">Email ID</label>
-                    <input
-                      type="email"
-                      placeholder="e.g. user@domain.com"
-                      value={emailId}
-                      onChange={(e) => setEmailId(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-slate-800"
-                    />
+                    <div className="flex bg-slate-50 border border-slate-300 rounded-xl overflow-hidden focus-within:ring-1 focus-within:ring-indigo-500 focus-within:border-indigo-500">
+                      <input
+                        type="text"
+                        placeholder="e.g. user"
+                        value={emailId ? (emailId.endsWith('@gmail.com') ? emailId.substring(0, emailId.indexOf('@gmail.com')) : emailId) : ''}
+                        onChange={(e) => {
+                          const prefix = e.target.value.replace(/[^a-zA-Z0-9._-]/g, '');
+                          setEmailId(prefix ? `${prefix}@gmail.com` : '');
+                        }}
+                        className="flex-1 bg-transparent px-3 py-2 text-slate-800 text-xs focus:outline-none"
+                      />
+                      <span className="bg-slate-300/60 text-slate-600 px-3 py-2 text-xs font-semibold flex items-center select-none border-l border-slate-200">
+                        @gmail.com
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -1179,6 +1359,75 @@ export default function Customers({ customers = [], addCustomer, updateCustomer,
                   <Download size={13} />
                   <span>Download Scan</span>
                 </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Superadmin OTP Verification Modal Overlay */}
+      {showOtpModal && (
+        <div className="fixed inset-0 z-50 bg-[#0F172A]/70 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-100 w-full max-w-md p-6 rounded-3xl shadow-2xl relative space-y-5">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+              <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <Lock size={18} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">OTP Deletion Lock</h3>
+                <p className="text-[11px] text-slate-400">Security Approval Verification</p>
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-600 leading-relaxed space-y-3">
+              <p>
+                Deleting records requires Superadmin authorization context. A one-time verification passcode (OTP) has been queued to Superadmin registered coordinate email: **kiruthickrn@gmail.com**.
+              </p>
+
+              {otpLoading && (
+                <div className="py-2 flex items-center gap-2 text-indigo-600 text-[11px] font-bold">
+                  <span className="w-2.5 h-2.5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></span>
+                  <span>Generating securely...</span>
+                </div>
+              )}
+
+              {otpError && (
+                <p className="text-xs text-rose-600 font-semibold bg-rose-50 p-2.5 rounded-xl">
+                  {otpError}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <input
+                type="text"
+                placeholder="Enter 6-digit OTP passcode"
+                maxLength={6}
+                value={enteredOtp}
+                onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, ''))}
+                className="w-full text-center py-3 bg-slate-50 border border-slate-200 text-slate-800 text-sm font-bold tracking-widest rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowOtpModal(false);
+                    setEnteredOtp('');
+                    setOtpError('');
+                  }}
+                  className="flex-1 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleVerifyOtpDelete}
+                  disabled={otpLoading}
+                  className="flex-1 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-xl transition cursor-pointer shadow-md shadow-indigo-100"
+                >
+                  Confirm Delete
+                </button>
               </div>
             </div>
           </div>
