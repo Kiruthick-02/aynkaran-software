@@ -152,10 +152,10 @@ export default function ReportSystem({
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         result = result.filter(item => 
-          item.name.toLowerCase().includes(query) ||
-          item.id.toLowerCase().includes(query) ||
-          item.mobile.includes(query) ||
-          item.email.toLowerCase().includes(query)
+          (item.name || '').toLowerCase().includes(query) ||
+          (item.id || '').toLowerCase().includes(query) ||
+          (item.mobile || '').includes(query) ||
+          (item.email || '').toLowerCase().includes(query)
         );
       }
 
@@ -186,11 +186,11 @@ export default function ReportSystem({
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         result = result.filter(item => 
-          item.name.toLowerCase().includes(query) ||
-          item.id.toLowerCase().includes(query) ||
-          item.mobile.includes(query) ||
-          item.email.toLowerCase().includes(query) ||
-          item.agentCode.toLowerCase().includes(query)
+          (item.name || '').toLowerCase().includes(query) ||
+          (item.id || '').toLowerCase().includes(query) ||
+          (item.mobile || '').includes(query) ||
+          (item.email || '').toLowerCase().includes(query) ||
+          (item.agentCode || '').toLowerCase().includes(query)
         );
       }
 
@@ -225,10 +225,10 @@ export default function ReportSystem({
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         result = result.filter(item => 
-          item.customerName.toLowerCase().includes(query) ||
-          item.id.toLowerCase().includes(query) ||
-          item.policyType.toLowerCase().includes(query) ||
-          item.issuedPolicyNumber.toLowerCase().includes(query)
+          (item.customerName || '').toLowerCase().includes(query) ||
+          (item.id || '').toLowerCase().includes(query) ||
+          (item.policyType || '').toLowerCase().includes(query) ||
+          (item.issuedPolicyNumber || '').toLowerCase().includes(query)
         );
       }
 
@@ -262,9 +262,9 @@ export default function ReportSystem({
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         result = result.filter(item => 
-          item.customerName.toLowerCase().includes(query) ||
-          item.policyNumber.toLowerCase().includes(query) ||
-          item.policyType.toLowerCase().includes(query)
+          (item.customerName || '').toLowerCase().includes(query) ||
+          (item.policyNumber || '').toLowerCase().includes(query) ||
+          (item.policyType || '').toLowerCase().includes(query)
         );
       }
 

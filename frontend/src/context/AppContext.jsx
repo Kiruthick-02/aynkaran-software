@@ -77,6 +77,10 @@ export function AppProvider({ children }) {
    * Load entire harmonized database dataset from MongoDB Express server
    */
   const loadStateFromServer = useCallback(async () => {
+    const isAuthenticatedFlag = localStorage.getItem('aynakaran_auth') === 'true';
+    if (!isAuthenticatedFlag) {
+      return;
+    }
     console.log('[System] Fetching latest CRM states from MongoDB database server...');
     try {
       const role = localStorage.getItem('aynakaran_role') || (localStorage.getItem('aynakaran_user') === 'admin' ? 'SuperAdmin' : 'Staff');

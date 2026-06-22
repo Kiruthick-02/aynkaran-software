@@ -69,7 +69,10 @@ export default function Reminders({ reminders = [], addReminder, updateReminder,
       if (filterType === 'completed') return r.completed;
       return r.targetType === filterType;
     })
-    .filter((r) => r.title.toLowerCase().includes(searchQuery.toLowerCase()) || r.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    .filter((r) => 
+      (r.title || '').toLowerCase().includes((searchQuery || '').toLowerCase()) || 
+      (r.description || '').toLowerCase().includes((searchQuery || '').toLowerCase())
+    );
 
   return (
     <div className="space-y-6">
