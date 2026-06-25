@@ -116,7 +116,7 @@ export function createExpressApp(db) {
    * 404 HANDLER
    * ==========================================
    */
-  app.use('*', (req, res) => {
+  app.use((req, res) => {
     res.status(404).json({
       success: false,
       error: 'API Route Not Found',
