@@ -79,7 +79,7 @@ function saveDatabase(data) {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT || 7860;
 
   // Connect to MongoDB if MONGODB_URI is provided
   await connectMongo();
@@ -1150,7 +1150,7 @@ Aynkaran Business CRM Autopilot`;
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    const distPath = path.join(process.cwd(), 'frontend', 'dist');
     app.use(express.static(distPath));
     app.use((req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
