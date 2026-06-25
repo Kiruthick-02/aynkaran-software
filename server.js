@@ -79,7 +79,13 @@ function saveDatabase(data) {
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT || 7860;
+  dotenv.config();
+
+console.log("process.env.PORT =", process.env.PORT);
+
+const PORT = process.env.PORT || 7860;
+
+console.log("Using PORT =", PORT);
 
   // Connect to MongoDB if MONGODB_URI is provided
   await connectMongo();
