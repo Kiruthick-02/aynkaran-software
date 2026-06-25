@@ -1,3 +1,16 @@
+---
+title: Aynkaran CRM
+emoji: 🚀
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
+
+# Aynkaran CRM
+
+Insurance CRM built with MERN Stack.
+
 # Aynkaran Consultants Desk ERP (Enterprise Workstation Solution)
 
 An advanced ERP workstation application custom built for **Aynkaran Consultants Ltd.**, facilitating Licencing Trainee Recruitment Pipeline Tracking, Customer Profile Records archiving, and Policy Insurance Renewal forecasting. 
