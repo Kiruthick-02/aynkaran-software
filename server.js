@@ -1,7 +1,4 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+
 
 import express from 'express';
 import path from 'path';
@@ -10,10 +7,7 @@ import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { MongoClient } from 'mongodb';
 import { documentRoutes } from './backend/routes/documentRoutes.js';
-<<<<<<< HEAD
 import { advisorRoutes } from './backend/routes/advisorRoutes.js';
-=======
->>>>>>> d96c25bb403988716178a2b21910505a45607a70
 import { sendSMSNotification } from './backend/utils/smsService.js';
 import { sendEmailReceipt } from './backend/utils/emailService.js';
 
@@ -83,7 +77,6 @@ function saveDatabase(data) {
 
 async function startServer() {
   const app = express();
-<<<<<<< HEAD
   dotenv.config();
 
 console.log("process.env.PORT =", process.env.PORT);
@@ -91,9 +84,6 @@ console.log("process.env.PORT =", process.env.PORT);
 const PORT = process.env.PORT || 7860;
 
 console.log("Using PORT =", PORT);
-=======
-  const PORT = 3000;
->>>>>>> d96c25bb403988716178a2b21910505a45607a70
 
   // Connect to MongoDB if MONGODB_URI is provided
   await connectMongo();
@@ -108,7 +98,6 @@ console.log("Using PORT =", PORT);
   // Initialize DB instance
   const db = loadDatabase();
 
-<<<<<<< HEAD
   // Keep advisor profile endpoints available in the root development server.
   // The dedicated backend server exposes the same router, but Vite proxies
   // local development requests here on port 7860.
@@ -116,8 +105,6 @@ console.log("Using PORT =", PORT);
     app.use('/api/advisors', advisorRoutes(mongoDbConnection));
   }
 
-=======
->>>>>>> d96c25bb403988716178a2b21910505a45607a70
   const activeOTPs = {};
 
   async function logActivity(username, action, target) {
@@ -1174,15 +1161,9 @@ Aynkaran Business CRM Autopilot`;
     });
     app.use(vite.middlewares);
   } else {
-<<<<<<< HEAD
     const distPath = path.join(process.cwd(), 'frontend', 'dist');
     app.use(express.static(distPath));
     app.use((req, res) => {
-=======
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
->>>>>>> d96c25bb403988716178a2b21910505a45607a70
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
