@@ -3,9 +3,6 @@
 import { sendSMSNotification } from '../utils/smsService.js';
 import { sendEmailReceipt } from '../utils/emailService.js';
 
-import { sendSMSNotification } from '../utils/smsService.js';
-import { sendEmailReceipt } from '../utils/emailService.js';
-
 // Controller matching policy pipeline applications using MongoDB Atlas
 export class PolicyController {
   constructor(db) {

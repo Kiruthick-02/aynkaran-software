@@ -1,11 +1,4 @@
-<<<<<<< HEAD
 // backend/routes/syncRoutes.js
-=======
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
->>>>>>> d96c25bb403988716178a2b21910505a45607a70
 
 import express from 'express';
 
@@ -18,6 +11,7 @@ export function syncRoutes(db) {
 
       if (Array.isArray(customers) && customers.length > 0) {
         const count = await db.collection('customers').countDocuments();
+
         if (count === 0) {
           await db.collection('customers').insertMany(customers);
         }
@@ -25,6 +19,7 @@ export function syncRoutes(db) {
 
       if (Array.isArray(candidates) && candidates.length > 0) {
         const count = await db.collection('candidates').countDocuments();
+
         if (count === 0) {
           await db.collection('candidates').insertMany(candidates);
         }
@@ -32,6 +27,7 @@ export function syncRoutes(db) {
 
       if (Array.isArray(policies) && policies.length > 0) {
         const count = await db.collection('policies').countDocuments();
+
         if (count === 0) {
           await db.collection('policies').insertMany(policies);
         }
@@ -39,19 +35,21 @@ export function syncRoutes(db) {
 
       if (Array.isArray(reminders) && reminders.length > 0) {
         const count = await db.collection('reminders').countDocuments();
+
         if (count === 0) {
           await db.collection('reminders').insertMany(reminders);
         }
       }
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         message: 'Database sync completed successfully',
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
       console.error('[Sync Error]', error);
-      res.status(500).json({
+
+      return res.status(500).json({
         success: false,
         error: error.message || 'Sync operation failed',
       });

@@ -1,70 +1,110 @@
 // backend/middleware/uploadMiddleware.js
+
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 
-<<<<<<< HEAD
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const ROOT_UPLOADS = path.join(process.cwd(), 'uploads');
 
 // Ensure base folders exist
-['companies', 'customers', 'candidates', 'recruitment', 'advisors', 'misc'].forEach((folder) => {
+[
+  'companies',
+  'customers',
+  'candidates',
+  'recruitment',
+  'advisors',
+  'misc',
+].forEach((folder) => {
   const dir = path.join(ROOT_UPLOADS, folder);
+
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 });
 
-/** Map targetType from frontend → folder name */
+/**
+ * Map targetType from frontend to folder name
+ */
 function resolveFolder(targetType) {
-  const t = String(targetType || 'misc').toLowerCase();
-  if (t === 'customer' || t === 'customers') return 'customers';
-  if (t === 'candidate' || t === 'candidates' || t === 'recruitment') return 'candidates';
-  if (t === 'advisor' || t === 'advisors') return 'advisors';
-  if (t === 'company' || t === 'companies') return 'companies';
+  const type = String(targetType || 'misc').toLowerCase();
+
+  if (type === 'customer' || type === 'customers') {
+    return 'customers';
+  }
+
+  if (
+    type === 'candidate' ||
+    type === 'candidates' ||
+    type === 'recruitment'
+  ) {
+    return 'candidates';
+  }
+
+  if (type === 'advisor' || type === 'advisors') {
+    return 'advisors';
+  }
+
+  if (type === 'company' || type === 'companies') {
+    return 'companies';
+  }
+
   return 'misc';
 }
 
-// ---------- Document upload (customers / candidates) – disk storage ----------
+// Document upload storage
 const documentStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const folder = resolveFolder(req.body?.targetType);
-    const dir = path.join(ROOT_UPLOADS, folder);
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
+    const directory = path.join(ROOT_UPLOADS, folder);
+
+    fs.mkdirSync(directory, { recursive: true });
+
+    cb(null, directory);
   },
+
   filename: (req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const ext = path.extname(file.originalname).toLowerCase() || '.bin';
-    cb(null, `${unique}${ext}`);
+    const uniqueName = `${Date.now()}-${Math.round(
+      Math.random() * 1e9
+    )}`;
+
+    const extension =
+      path.extname(file.originalname).toLowerCase() || '.bin';
+
+    cb(null, `${uniqueName}${extension}`);
   },
 });
-=======
-// Configure high performance file buffer saving directory locations dynamically
-const storage = multer.memoryStorage();
->>>>>>> d96c25bb403988716178a2b21910505a45607a70
 
 export const uploadMiddleware = multer({
   storage: documentStorage,
+
   limits: {
-    fileSize: 2 * 1024 * 1024, // 2 MB
+    fileSize: 2 * 1024 * 1024,
   },
+
   fileFilter: (req, file, cb) => {
-    const ok =
-      (file.mimetype &&
-        (file.mimetype.startsWith('image/') ||
-          file.mimetype === 'application/pdf')) ||
+    const isAllowedMimeType =
+      file.mimetype &&
+      (file.mimetype.startsWith('image/') ||
+        file.mimetype === 'application/pdf');
+
+    const isAllowedExtension =
       /\.(jpe?g|png|gif|webp|pdf)$/i.test(file.originalname || '');
-    if (ok) cb(null, true);
-    else cb(new Error('Only images (JPG/PNG/WebP) or PDF are allowed'));
+
+    if (isAllowedMimeType || isAllowedExtension) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only images (JPG/PNG/WebP) or PDF are allowed'));
+    }
   },
 });
 
-// ---------- Company logo / background (existing behaviour) ----------
+// Company logo and background image storage
 const companyDir = path.join(ROOT_UPLOADS, 'companies');
+
 if (!fs.existsSync(companyDir)) {
   fs.mkdirSync(companyDir, { recursive: true });
 }
@@ -73,18 +113,26 @@ const companyStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, companyDir);
   },
+
   filename: (req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const ext = path.extname(file.originalname).toLowerCase() || '.png';
-    cb(null, `${unique}${ext}`);
+    const uniqueName = `${Date.now()}-${Math.round(
+      Math.random() * 1e9
+    )}`;
+
+    const extension =
+      path.extname(file.originalname).toLowerCase() || '.png';
+
+    cb(null, `${uniqueName}${extension}`);
   },
 });
 
 export const uploadCompanyMedia = multer({
   storage: companyStorage,
+
   limits: {
     fileSize: 10 * 1024 * 1024,
   },
+
   fileFilter: (req, file, cb) => {
     if (file.mimetype && file.mimetype.startsWith('image/')) {
       cb(null, true);

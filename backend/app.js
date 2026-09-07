@@ -50,7 +50,6 @@ export function createExpressApp(db) {
    * ==========================================
    */
   app.use(express.json({ limit: '50mb' }));
-<<<<<<< HEAD
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // Serve document uploads
@@ -61,7 +60,7 @@ export function createExpressApp(db) {
    * API ROUTES
    * ==========================================
    */
-  
+
   // 1. Core Auth & Security
   app.use('/api/auth', authRoutes(db));
 
@@ -96,16 +95,6 @@ export function createExpressApp(db) {
 
   // 8. Content Publishing API
   app.use('/api/content', contentRoutes(db));
-=======
-
-  app.use(express.urlencoded({
-    limit: '50mb',
-    extended: true,
-  }));
->>>>>>> d96c25bb403988716178a2b21910505a45607a70
-
-  // Serve document uploads statically
-  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   /**
    * ==========================================
@@ -147,8 +136,5 @@ export function createExpressApp(db) {
 
   return app;
 }
-<<<<<<< HEAD
 
 export default createExpressApp;
-=======
->>>>>>> d96c25bb403988716178a2b21910505a45607a70

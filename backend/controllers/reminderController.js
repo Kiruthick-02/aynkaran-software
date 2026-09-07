@@ -1,7 +1,3 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
 
 import { sendSMSNotification } from '../utils/smsService.js';
 import { sendEmailReceipt } from '../utils/emailService.js';

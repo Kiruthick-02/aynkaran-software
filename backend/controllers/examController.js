@@ -1,7 +1,4 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+
 
 // IRDAI Carrier Certification and online exams controller using MongoDB Atlas
 export class ExamController {
