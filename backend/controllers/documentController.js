@@ -176,6 +176,7 @@ export class DocumentController {
         });
       }
 
+<<<<<<< HEAD
       const category = req.body.category || 'Miscellaneous';
       const targetId = req.body.targetId || '';
       const targetType = req.body.targetType || 'misc';
@@ -184,6 +185,11 @@ export class DocumentController {
       // Public path served by express.static('/uploads')
       const publicPath = `/uploads/${folder}/${req.file.filename}`;
       const originalName = req.file.originalname || req.file.filename;
+=======
+      const { category, targetId, targetType } = req.body;
+      const base64Data = req.file.buffer.toString('base64');
+      const fileUrl = `data:${req.file.mimetype};base64,${base64Data}`;
+>>>>>>> d96c25bb403988716178a2b21910505a45607a70
 
       const newDoc = {
         id: `doc-${Date.now().toString().slice(-6)}`,
@@ -202,6 +208,7 @@ export class DocumentController {
         uploadedAt: new Date().toISOString(),
       };
 
+<<<<<<< HEAD
       // A replacement is one logical document, not an extra vault entry.
       // Remove the prior entry for this owner/category before writing the new
       // source record and the canonical vault record.
@@ -216,6 +223,73 @@ export class DocumentController {
           category
         });
         await this.db.collection('documents').insertOne(newDoc).catch(e => console.warn('[Doc Record Insert]', e.message));
+=======
+      if (targetType === 'recruitment') {
+        if (this.db && typeof this.db.collection === 'function') {
+          const candidate = await this.db.collection('candidates').findOne({ id: targetId });
+          if (!candidate) return res.status(404).json({ error: 'Candidate file target not found.' });
+
+          const docs = typeof candidate.documents === 'string' ? JSON.parse(candidate.documents || '[]') : (candidate.documents || []);
+          docs.push(newDoc);
+
+          const updateData = { documents: docs };
+          if (category === 'profilePicture') {
+            updateData.profilePicture = fileUrl;
+          }
+
+          await this.db.collection('candidates').updateOne(
+            { id: targetId },
+            { $set: updateData }
+          );
+        } else {
+          const candidate = this.db.candidates?.find(c => c.id === targetId);
+          if (!candidate) return res.status(404).json({ error: 'Candidate file target not found.' });
+          candidate.documents = candidate.documents || [];
+          candidate.documents.push(newDoc);
+          if (category === 'profilePicture') {
+            candidate.profilePicture = fileUrl;
+          }
+          try {
+            const fs = await import('fs');
+            const path = await import('path');
+            fs.writeFileSync(path.join(process.cwd(), 'database.json'), JSON.stringify(this.db, null, 2), 'utf-8');
+          } catch (e) {
+            console.error('Failed to write database file', e);
+          }
+        }
+      } else if (targetType === 'customers') {
+        if (this.db && typeof this.db.collection === 'function') {
+          const customer = await this.db.collection('customers').findOne({ id: targetId });
+          if (!customer) return res.status(404).json({ error: 'Customer ledger target not found.' });
+
+          const kyc = typeof customer.kycDocuments === 'string' ? JSON.parse(customer.kycDocuments || '{}') : (customer.kycDocuments || {});
+          kyc[category || 'other'] = fileUrl;
+
+          const uploadDates = typeof customer.kycUploadDates === 'string' ? JSON.parse(customer.kycUploadDates || '{}') : (customer.kycUploadDates || {});
+          uploadDates[category || 'other'] = new Date().toISOString().split('T')[0];
+
+          await this.db.collection('customers').updateOne(
+            { id: targetId },
+            { $set: { kycDocuments: kyc, kycUploadDates: uploadDates } }
+          );
+        } else {
+          const customer = this.db.customers?.find(c => c.id === targetId);
+          if (!customer) return res.status(404).json({ error: 'Customer ledger target not found.' });
+          
+          customer.kycDocuments = customer.kycDocuments || {};
+          customer.kycDocuments[category || 'other'] = fileUrl;
+
+          customer.kycUploadDates = customer.kycUploadDates || {};
+          customer.kycUploadDates[category || 'other'] = new Date().toISOString().split('T')[0];
+          try {
+            const fs = await import('fs');
+            const path = await import('path');
+            fs.writeFileSync(path.join(process.cwd(), 'database.json'), JSON.stringify(this.db, null, 2), 'utf-8');
+          } catch (e) {
+            console.error('Failed to write database file', e);
+          }
+        }
+>>>>>>> d96c25bb403988716178a2b21910505a45607a70
       }
 
       // ---------- Update customer record ----------
@@ -429,6 +503,7 @@ export class DocumentController {
       res.status(500).json({ error: e.message });
     }
   };
+<<<<<<< HEAD
 
   /** Delete a vault record and its mirrored source-record entry. */
   delete = async (req, res) => {
@@ -582,4 +657,6 @@ export class DocumentController {
       res.status(500).json({ error: e.message });
     }
   };
+=======
+>>>>>>> d96c25bb403988716178a2b21910505a45607a70
 }

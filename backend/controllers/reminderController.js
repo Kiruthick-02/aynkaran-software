@@ -75,6 +75,27 @@ export class ReminderController {
         data.notificationResults = { sms, whatsapp, email: emailResult };
       }
 
+      // Auto Dispatch Automated SMS, WhatsApp, and Email instantly on backend
+      if (data.customerMobile || data.customerEmail) {
+        const mobile = data.customerMobile;
+        const email = data.customerEmail;
+        const title = data.title || 'Aynkaran Notification';
+        const desc = data.description || '';
+        const text = `${title} - ${desc}`;
+
+        if (mobile) {
+          // 1. Cellular SMS
+          sendSMSNotification(mobile, text).catch(e => console.error('[Backend SMS error]', e));
+          // 2. WhatsApp Simulation (Prefix with whatsapp:)
+          sendSMSNotification(`whatsapp:${mobile}`, text).catch(e => console.error('[Backend WhatsApp error]', e));
+        }
+
+        if (email && email !== 'no-email@aynakaran.com') {
+          // 3. Corporate Email
+          sendEmailReceipt(email, title, text).catch(e => console.error('[Backend Email error]', e));
+        }
+      }
+
       await this.db.collection('reminders').insertOne(data);
 
       const responseData = { ...data };

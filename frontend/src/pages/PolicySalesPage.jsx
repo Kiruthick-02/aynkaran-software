@@ -10,6 +10,7 @@ export default function PolicySalesPage() {
     addPolicy,
     updatePolicy,
     deletePolicy,
+<<<<<<< HEAD
     customers,
     addCustomer,
     updateCustomer,
@@ -24,6 +25,10 @@ export default function PolicySalesPage() {
     // If AppContext has setNotification / showToast, call it here:
     // showToast?.(msg);
   };
+=======
+    customers
+  } = useApp();
+>>>>>>> d96c25bb403988716178a2b21910505a45607a70
 
   return (
     <PolicySales

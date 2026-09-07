@@ -3,6 +3,9 @@
 import { sendSMSNotification } from '../utils/smsService.js';
 import { sendEmailReceipt } from '../utils/emailService.js';
 
+import { sendSMSNotification } from '../utils/smsService.js';
+import { sendEmailReceipt } from '../utils/emailService.js';
+
 // Controller matching high density recruited/candidate files using MongoDB Atlas
 export class RecruitmentController {
   constructor(db) {
@@ -62,6 +65,7 @@ export class RecruitmentController {
       const data = { ...req.body };
       delete data._id; // _id must be immutable
 
+<<<<<<< HEAD
       if (data.stageNumber) {
         data.stageNumber = Number(data.stageNumber);
       }
@@ -71,6 +75,11 @@ export class RecruitmentController {
         oldCandidate = await this.db.collection('candidates').findOne({
           $or: [{ id }, { _id: id }, { id: String(id) }]
         });
+=======
+      let oldCandidate = null;
+      try {
+        oldCandidate = await this.db.collection('candidates').findOne({ id });
+>>>>>>> d96c25bb403988716178a2b21910505a45607a70
       } catch (err) {
         console.error('[Backend Find Candidate error]', err);
       }
@@ -112,11 +121,15 @@ export class RecruitmentController {
         }
       }
 
+<<<<<<< HEAD
       await this.db.collection('candidates').updateOne(
         { $or: [{ id }, { _id: id }, { id: String(id) }] },
         { $set: { ...data, id: data.id || id } },
         { upsert: true }
       );
+=======
+      await this.db.collection('candidates').updateOne({ id }, { $set: data });
+>>>>>>> d96c25bb403988716178a2b21910505a45607a70
       res.json({ id, ...data });
     } catch (e) {
       res.status(400).json({ error: e.message });

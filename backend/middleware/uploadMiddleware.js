@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 
+<<<<<<< HEAD
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -41,6 +42,10 @@ const documentStorage = multer.diskStorage({
     cb(null, `${unique}${ext}`);
   },
 });
+=======
+// Configure high performance file buffer saving directory locations dynamically
+const storage = multer.memoryStorage();
+>>>>>>> d96c25bb403988716178a2b21910505a45607a70
 
 export const uploadMiddleware = multer({
   storage: documentStorage,

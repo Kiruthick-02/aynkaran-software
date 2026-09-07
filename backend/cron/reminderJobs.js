@@ -43,7 +43,10 @@ export async function executeDailyReminderJobs(db) {
           const remId = `rem-auto-${Date.now().toString().slice(-4)}`;
           const parentMobile = cand.mobile || '';
           const parentEmail = cand.email || '';
+<<<<<<< HEAD
           const candidateMessage = `Aynkaran Desk Trainee Notice: Dear ${cand.name}, we notice your Licensing onboarding registration file is pending. Our trainers will reach out to help you step forward.`;
+=======
+>>>>>>> d96c25bb403988716178a2b21910505a45607a70
 
           await db.collection('reminders').insertOne({
             id: remId,
@@ -60,6 +63,7 @@ export async function executeDailyReminderJobs(db) {
             createdAt: now.toISOString()
           });
 
+<<<<<<< HEAD
           // Dispatches through NotificationService
           if (parentMobile) {
             await notificationService.dispatch({
@@ -71,6 +75,16 @@ export async function executeDailyReminderJobs(db) {
               messageBody: candidateMessage
             }).catch(e => console.error('Cron target WhatsApp/SMS failed for stuck candidate:', e));
           }
+=======
+          // Dispatches WhatsApp/SMS ping dynamically
+          if (cand.mobile) {
+            const candidateMessage = `Aynkaran Desk Trainee Notice: Dear ${cand.name}, we notice your Licensing onboarding registration file is pending. Our trainers will reach out to help you step forward.`;
+            await sendSMSNotification(cand.mobile, candidateMessage).catch(e => console.error('Cron target SMS failed for stuck candidate:', e));
+            await sendSMSNotification(`whatsapp:${cand.mobile}`, candidateMessage).catch(e => console.error('Cron target WhatsApp failed for stuck candidate:', e));
+          }
+        } else {
+          console.log(`[Recruitment Alert Skip] Duplicate reminder already exists for candidate: ${cand.name}`);
+>>>>>>> d96c25bb403988716178a2b21910505a45607a70
         }
       }
     }

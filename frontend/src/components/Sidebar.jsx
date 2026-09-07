@@ -1,5 +1,6 @@
 //src/components/Sidebar.jsx
 import React from 'react';
+<<<<<<< HEAD
 import { 
   LayoutDashboard, 
   Building2, 
@@ -30,6 +31,36 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, adminUsername = "SuperAdmi
     { id: 'staff_management', name: 'Staff Supervision', icon: ShieldAlert },
     { id: 'reports', name: 'Exports & Reports', icon: FileText },
     { id: 'content', name: 'Content Publishing', icon: Globe },
+=======
+import { useApp } from '../context/AppContext';
+import {
+  LayoutDashboard,
+  UserPlus,
+  FileText,
+  Users,
+  Bell,
+  FolderClosed,
+  Download,
+  RefreshCw,
+  LogOut,
+  ShieldCheck
+} from 'lucide-react';
+
+export default function Sidebar({ activeTab, setActiveTab, onLogout, adminUsername }) {
+  const { userRole } = useApp();
+
+  const menuItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    ...(userRole === 'SuperAdmin' ? [
+      { id: 'recruitment', label: 'Recruitment (Agents)', icon: UserPlus },
+      { id: 'staff_management', label: 'Staff Supervision', icon: ShieldCheck }
+    ] : []),
+    { id: 'policies', label: 'Policy Sales', icon: FileText },
+    { id: 'customers', label: 'Customer CRM', icon: Users },
+    { id: 'reminders', label: 'Reminders Console', icon: Bell },
+    { id: 'documents', label: 'Document Vault', icon: FolderClosed },
+    { id: 'reports', label: 'Export & Reports', icon: Download },
+>>>>>>> d96c25bb403988716178a2b21910505a45607a70
   ];
 
   return (

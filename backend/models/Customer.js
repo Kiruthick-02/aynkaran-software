@@ -1,4 +1,12 @@
+<<<<<<< HEAD
 //backend/models/Customer.js
+=======
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+>>>>>>> d96c25bb403988716178a2b21910505a45607a70
 // MongoDB Atlas High-Speed CRM client profile document model definition
 export class Customer {
   static getCollectionName() {

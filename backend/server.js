@@ -14,7 +14,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Hardcoded to run only on port 5000 as requested
+<<<<<<< HEAD
 const PORT = process.env.PORT || 7860;
+=======
+const PORT = 5000;
+>>>>>>> d96c25bb403988716178a2b21910505a45607a70
 
 async function run() {
   try {
