@@ -1,19 +1,18 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
+// backend/app.js
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { syncRoutes } from './routes/syncRoutes.js';
-
 import { customerRoutes } from './routes/customerRoutes.js';
 import { recruitmentRoutes } from './routes/recruitmentRoutes.js';
 import { policyRoutes } from './routes/policyRoutes.js';
+import { PolicyController } from './controllers/policyController.js';
 import { reminderRoutes } from './routes/reminderRoutes.js';
 import { authRoutes } from './routes/authRoutes.js';
 import { documentRoutes } from './routes/documentRoutes.js';
+import { enquiryRoutes } from './routes/enquiryRoutes.js';
+import { contentRoutes } from './routes/contentRoutes.js';
+import { advisorRoutes } from './routes/advisorRoutes.js';
 
 export function createExpressApp(db) {
   const app = express();
@@ -24,42 +23,25 @@ export function createExpressApp(db) {
    * ==========================================
    */
   const allowedOrigins = [
-    'http://localhost:5173',
-    'https://aynkaran-software-production-4e1c.up.railway.app',
+    'http://localhost:5173',   // Desktop frontend
+    'http://127.0.0.1:5173',
+    'http://localhost:3000',   // Website frontend
+    'http://127.0.0.1:3000',
   ];
 
   app.use(cors({
     origin: function (origin, callback) {
-
-      // Allow requests with no origin
-      // (mobile apps, postman, curl, etc.)
-      if (!origin) {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin) || origin.includes('up.railway.app')) {
         return callback(null, true);
       }
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(
-        new Error(`CORS blocked for origin: ${origin}`),
-        false
-      );
+      return callback(new Error(`CORS blocked for origin: ${origin}`), false);
     },
-
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
-
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'Origin',
-      'Accept',
-    ],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept'],
   }));
 
-  // Handle preflight requests
   app.options('*', cors());
 
   /**
@@ -68,14 +50,51 @@ export function createExpressApp(db) {
    * ==========================================
    */
   app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-  app.use(express.urlencoded({
-    limit: '50mb',
-    extended: true,
-  }));
-
-  // Serve document uploads statically
+  // Serve document uploads
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+  /**
+   * ==========================================
+   * API ROUTES
+   * ==========================================
+   */
+  
+  // 1. Core Auth & Security
+  app.use('/api/auth', authRoutes(db));
+
+  // 2. Documents & Storage
+  app.use('/api/documents', documentRoutes(db));
+
+  // 3. Operations & Customer Lifecycle
+  app.use('/api/customers', customerRoutes(db));
+
+  // 3.1 Policy Sales Lead endpoints
+  const policyController = new PolicyController(db);
+  app.get('/api/policies', policyController.getAll);
+  app.post('/api/policies', policyController.create);
+  app.put('/api/policies/:id', policyController.update);
+  app.delete('/api/policies/:id', policyController.delete);
+
+  // 3.2 Insurance company / product scheme endpoints
+  app.use('/api', policyRoutes(db));
+
+  // 4. Recruitment & Candidates
+  app.use('/api/candidates', recruitmentRoutes(db));
+
+  // 5. Automation & Reminders
+  app.use('/api/reminders', reminderRoutes(db));
+
+  // 6. Data Synchronization
+  app.use('/api/sync', syncRoutes(db));
+  app.use('/api/enquiries', enquiryRoutes(db));
+
+  // 7. Advisor Management Domain & Lifecycle
+  app.use('/api/advisors', advisorRoutes(db));
+
+  // 8. Content Publishing API
+  app.use('/api/content', contentRoutes(db));
 
   /**
    * ==========================================
@@ -89,31 +108,13 @@ export function createExpressApp(db) {
       engine: 'MongoDB Document',
       service: 'Aynkaran Desk CRM Core Server',
       timestamp: new Date().toISOString(),
+      publicEnquiryStatus: 'Open'
     });
   });
 
   /**
    * ==========================================
-   * API ROUTES
-   * ==========================================
-   */
-  app.use('/api/auth', authRoutes(db));
-
-  app.use('/api/documents', documentRoutes(db));
-
-  app.use('/api/customers', customerRoutes(db));
-
-  app.use('/api/candidates', recruitmentRoutes(db));
-
-  app.use('/api/policies', policyRoutes(db));
-
-  app.use('/api/reminders', reminderRoutes(db));
-
-  app.use('/api/sync', syncRoutes(db));
-
-  /**
-   * ==========================================
-   * 404 HANDLER
+   * ERROR HANDLERS
    * ==========================================
    */
   app.use((req, res) => {
@@ -124,14 +125,8 @@ export function createExpressApp(db) {
     });
   });
 
-  /**
-   * ==========================================
-   * GLOBAL ERROR HANDLER
-   * ==========================================
-   */
   app.use((err, req, res, next) => {
     console.error('[Express Error]', err);
-
     res.status(err.status || 500).json({
       success: false,
       error: err.message || 'Internal Server Error',
@@ -141,3 +136,5 @@ export function createExpressApp(db) {
 
   return app;
 }
+
+export default createExpressApp;

@@ -1,7 +1,3 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
 
 // MongoDB Atlas High-Speed CRM upload tracker document model definition
 export class Document {

@@ -52,6 +52,7 @@ export class ReminderController {
       data.createdAt = data.createdAt || new Date().toISOString();
 
       data.channels = data.channels || {};
+      data.deliveryStatus = data.deliveryStatus || {};
 
       // Auto Dispatch Automated SMS, WhatsApp, and Email instantly on backend
       if (data.customerMobile || data.customerEmail) {
@@ -61,17 +62,17 @@ export class ReminderController {
         const desc = data.description || '';
         const text = `${title} - ${desc}`;
 
-        if (mobile) {
-          // 1. Cellular SMS
-          sendSMSNotification(mobile, text).catch(e => console.error('[Backend SMS error]', e));
-          // 2. WhatsApp Simulation (Prefix with whatsapp:)
-          sendSMSNotification(`whatsapp:${mobile}`, text).catch(e => console.error('[Backend WhatsApp error]', e));
-        }
-
-        if (email && email !== 'no-email@aynakaran.com') {
-          // 3. Corporate Email
-          sendEmailReceipt(email, title, text).catch(e => console.error('[Backend Email error]', e));
-        }
+        const [sms, whatsapp, emailResult] = await Promise.all([
+          mobile ? sendSMSNotification(mobile, text) : Promise.resolve({ success: false, error: 'No mobile number' }),
+          mobile ? sendSMSNotification(`whatsapp:${mobile}`, text) : Promise.resolve({ success: false, error: 'No mobile number' }),
+          email && email !== 'no-email@aynakaran.com' ? sendEmailReceipt(email, title, text) : Promise.resolve({ success: false, error: 'No email address' })
+        ]);
+        data.deliveryStatus = {
+          sms: sms.success ? (sms.simulated ? 'SIMULATED' : 'SENT') : 'FAILED',
+          whatsapp: whatsapp.success ? (whatsapp.simulated ? 'SIMULATED' : 'SENT') : 'FAILED',
+          email: emailResult.success ? (emailResult.simulated ? 'SIMULATED' : 'SENT') : 'FAILED'
+        };
+        data.notificationResults = { sms, whatsapp, email: emailResult };
       }
 
       await this.db.collection('reminders').insertOne(data);

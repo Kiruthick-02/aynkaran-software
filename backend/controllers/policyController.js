@@ -1,7 +1,4 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+//backend/controllers/policyController.js
 
 import { sendSMSNotification } from '../utils/smsService.js';
 import { sendEmailReceipt } from '../utils/emailService.js';

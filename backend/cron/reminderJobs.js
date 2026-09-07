@@ -3,15 +3,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { sendSMSNotification } from '../utils/smsService.js';
+import { ReminderService } from '../services/reminderService.js';
+import { NotificationService } from '../services/notificationService.js';
 
-// Executes daily checking on active and near-overdue trainee tasks using MongoDB Atlas
+// Executes daily checking on active and near-overdue trainee tasks and advisor milestones using MongoDB Atlas
 export async function executeDailyReminderJobs(db) {
-  console.log('[Cron Job] Checking candidate follow-ups and stage delay indicators via MongoDB...');
+  console.log('[Cron Job] Checking candidate follow-ups, milestone schedules, and advisor license expiry...');
   
   try {
+    const reminderService = new ReminderService(db);
+    const notificationService = new NotificationService(db);
+
+    // 1. Run date-based milestone scan (7d/3d/1d training, exam, license expiry)
+    await reminderService.runDailyMilestoneScan();
+
+    // 2. Candidate stuck stage check
     const activeCandidates = await db.collection('candidates').find({
-      currentStage: { $nin: ['Generate Agent Code', 'Meeting Appointment'] }
+      currentStage: { $nin: ['Generate Agent Code', 'Meeting Appointment', 'Advisor Active'] }
     }).toArray();
 
     const now = new Date();
@@ -35,6 +43,7 @@ export async function executeDailyReminderJobs(db) {
           const remId = `rem-auto-${Date.now().toString().slice(-4)}`;
           const parentMobile = cand.mobile || '';
           const parentEmail = cand.email || '';
+          const candidateMessage = `Aynkaran Desk Trainee Notice: Dear ${cand.name}, we notice your Licensing onboarding registration file is pending. Our trainers will reach out to help you step forward.`;
 
           await db.collection('reminders').insertOne({
             id: remId,
@@ -51,14 +60,17 @@ export async function executeDailyReminderJobs(db) {
             createdAt: now.toISOString()
           });
 
-          // Dispatches WhatsApp/SMS ping dynamically
-          if (cand.mobile) {
-            const candidateMessage = `Aynkaran Desk Trainee Notice: Dear ${cand.name}, we notice your Licensing onboarding registration file is pending. Our trainers will reach out to help you step forward.`;
-            await sendSMSNotification(cand.mobile, candidateMessage).catch(e => console.error('Cron target SMS failed for stuck candidate:', e));
-            await sendSMSNotification(`whatsapp:${cand.mobile}`, candidateMessage).catch(e => console.error('Cron target WhatsApp failed for stuck candidate:', e));
+          // Dispatches through NotificationService
+          if (parentMobile) {
+            await notificationService.dispatch({
+              reminderId: remId,
+              candidateId: candidateIdStr,
+              recipient: parentMobile,
+              channel: 'WHATSAPP',
+              subject: 'Licensing Onboarding Notice',
+              messageBody: candidateMessage
+            }).catch(e => console.error('Cron target WhatsApp/SMS failed for stuck candidate:', e));
           }
-        } else {
-          console.log(`[Recruitment Alert Skip] Duplicate reminder already exists for candidate: ${cand.name}`);
         }
       }
     }

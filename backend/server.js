@@ -1,7 +1,4 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+//backend/server.js
 
 import dotenv from 'dotenv';
 dotenv.config();
@@ -63,7 +60,7 @@ async function run() {
       });
     }
 
-    /**
+        /**
      * ===============================
      * START SERVER
      * ===============================
@@ -74,6 +71,7 @@ async function run() {
     Aynkaran Server Started Successfully
     Environment : ${process.env.NODE_ENV || 'development'}
     Port        : ${PORT}
+    Listening   : 0.0.0.0 (all interfaces)
 ========================================
       `);
     });

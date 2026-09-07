@@ -1,7 +1,4 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+// backend/controllers/recruitmentController.js
 
 import { sendSMSNotification } from '../utils/smsService.js';
 import { sendEmailReceipt } from '../utils/emailService.js';
@@ -18,6 +15,11 @@ export class RecruitmentController {
       const formatted = rows.map(r => ({
         ...r,
         id: r.id || r._id.toString(),
+        stageNumber: r.stageNumber ? Number(r.stageNumber) : 1,
+        currentStage: r.currentStage || 'Candidate Registered',
+        photoUrl: r.photoUrl || r.profilePicture || r.passportPhoto || '',
+        profilePicture: r.profilePicture || r.photoUrl || r.passportPhoto || '',
+        passportPhoto: r.passportPhoto || r.profilePicture || r.photoUrl || '',
         _id: undefined,
         stageHistory: typeof r.stageHistory === 'string' ? JSON.parse(r.stageHistory || '[]') : (r.stageHistory || []),
         documents: typeof r.documents === 'string' ? JSON.parse(r.documents || '[]') : (r.documents || []),
@@ -34,6 +36,8 @@ export class RecruitmentController {
     try {
       const data = { ...req.body };
       data.id = data.id || `cand-${Date.now().toString().slice(-5)}`;
+      data.stageNumber = data.stageNumber ? Number(data.stageNumber) : 1;
+      data.currentStage = data.currentStage || 'Candidate Registered';
       data.pendingStageSince = data.pendingStageSince || new Date().toISOString().split('T')[0];
 
       // Safeguard collections
@@ -58,9 +62,15 @@ export class RecruitmentController {
       const data = { ...req.body };
       delete data._id; // _id must be immutable
 
+      if (data.stageNumber) {
+        data.stageNumber = Number(data.stageNumber);
+      }
+
       let oldCandidate = null;
       try {
-        oldCandidate = await this.db.collection('candidates').findOne({ id });
+        oldCandidate = await this.db.collection('candidates').findOne({
+          $or: [{ id }, { _id: id }, { id: String(id) }]
+        });
       } catch (err) {
         console.error('[Backend Find Candidate error]', err);
       }
@@ -102,7 +112,11 @@ export class RecruitmentController {
         }
       }
 
-      await this.db.collection('candidates').updateOne({ id }, { $set: data });
+      await this.db.collection('candidates').updateOne(
+        { $or: [{ id }, { _id: id }, { id: String(id) }] },
+        { $set: { ...data, id: data.id || id } },
+        { upsert: true }
+      );
       res.json({ id, ...data });
     } catch (e) {
       res.status(400).json({ error: e.message });
@@ -112,7 +126,10 @@ export class RecruitmentController {
   delete = async (req, res) => {
     try {
       const { id } = req.params;
-      await this.db.collection('candidates').deleteOne({ id });
+      await this.db.collection('documents').deleteMany({ $or: [{ targetId: id }, { targetId: String(id) }] });
+      await this.db.collection('candidates').deleteOne({
+        $or: [{ id }, { _id: id }, { id: String(id) }]
+      });
       res.json({ success: true, message: 'Trainee candidate profile cleared securely.' });
     } catch (e) {
       res.status(500).json({ error: e.message });

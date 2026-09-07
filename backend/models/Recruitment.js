@@ -1,7 +1,4 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+//backend/models/Recruitment.js
 
 // MongoDB Atlas High-Speed CRM Recruitment Candidate/Trainee document model definition
 export class Recruitment {

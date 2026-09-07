@@ -75,18 +75,18 @@ export default function Reminders({ reminders = [], addReminder, updateReminder,
     );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5">
+    <div className="space-y-6 text-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-5">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-slate-900 font-sans">Module 4: Automated Reminders & Broadcasting Console</h2>
-          <p className="text-xs text-slate-500 font-medium">
+          <h2 className="text-xl font-black tracking-tight text-white font-sans uppercase">Reminders & Broadcasting Console</h2>
+          <p className="text-xs text-slate-400 font-medium">
             Monitor trigger schedules (1 month, 3 weeks, 2 weeks, 1 week, 3 days, and 1 day before) and dispatch announcements to clients & agents.
           </p>
         </div>
         {visibleReminders.some((r) => r.completed) && (
           <button
             onClick={handleClearCompleted}
-            className="mt-3 sm:mt-0 text-rose-600 hover:text-rose-800 font-bold text-xs bg-rose-50 border border-rose-200 px-3 py-2 rounded-xl transition-all hover:cursor-pointer"
+            className="mt-3 sm:mt-0 text-rose-300 hover:text-white font-bold text-xs bg-rose-500/10 border border-rose-500/30 px-3 py-2 rounded-xl transition-all hover:cursor-pointer"
           >
             Clear Archive Logs
           </button>
@@ -106,14 +106,14 @@ export default function Reminders({ reminders = [], addReminder, updateReminder,
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-4 border border-slate-200 rounded-2xl shadow-sm">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#1e293b] p-4 border border-slate-800 rounded-2xl shadow-xl">
         <div className="relative">
           <input
             type="text"
             placeholder="Search alerts (e.g. Priyamvada)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-9 pr-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none"
+            className="w-full bg-slate-950 border border-slate-700 rounded-xl py-2 pl-9 pr-4 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
           />
           <Search className="absolute left-3 top-2.5 text-slate-400" size={14} />
         </div>
@@ -133,7 +133,7 @@ export default function Reminders({ reminders = [], addReminder, updateReminder,
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                 filterType === cat.id
                   ? 'bg-indigo-600 text-white shadow-md'
-                  : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200'
+                  : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700'
               }`}
             >
               {cat.label}
@@ -149,10 +149,10 @@ export default function Reminders({ reminders = [], addReminder, updateReminder,
               key={reminder.id}
               className={`p-5 rounded-2xl border transition-all hover:shadow-md ${
                 reminder.completed
-                  ? 'bg-slate-50/70 border-slate-200 text-slate-500 opacity-75'
+                  ? 'bg-slate-900/60 border-slate-800 text-slate-500 opacity-75'
                   : reminder.triggerType === 'Due date' || reminder.triggerType === '1 day before'
                   ? 'bg-rose-50/30 border-rose-200/60'
-                  : 'bg-white border-slate-200'
+                  : 'bg-[#1e293b] border-slate-800 shadow-lg'
               }`}
             >
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -168,7 +168,7 @@ export default function Reminders({ reminders = [], addReminder, updateReminder,
                   </div>
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className={`font-extrabold text-sm ${reminder.completed ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                      <p className={`font-extrabold text-sm ${reminder.completed ? 'line-through text-slate-400' : 'text-white'}`}>
                         {reminder.title}
                       </p>
                       <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
@@ -186,7 +186,7 @@ export default function Reminders({ reminders = [], addReminder, updateReminder,
                         {reminder.targetType}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-600 mt-1">{reminder.description}</p>
+                    <p className="text-xs text-slate-400 mt-1">{reminder.description}</p>
                     
                     {(reminder.customerMobile || reminder.customerEmail) && (
                       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] font-mono text-indigo-600 mt-1 px-2.5 py-1 rounded-lg w-fit border border-indigo-100/60 bg-indigo-50/50">
@@ -267,7 +267,7 @@ export default function Reminders({ reminders = [], addReminder, updateReminder,
         })}
 
         {filtered.length === 0 && (
-          <div className="py-16 text-center text-slate-400 italic text-sm bg-white border border-dashed rounded-2xl">
+          <div className="py-16 text-center text-slate-500 italic text-sm bg-[#1e293b] border border-dashed border-slate-700 rounded-2xl">
             No scheduling triggers discovered under search constraints.
           </div>
         )}

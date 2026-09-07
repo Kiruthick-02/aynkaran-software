@@ -1,7 +1,3 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
 
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');

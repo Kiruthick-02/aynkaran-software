@@ -1,8 +1,4 @@
-/**
- * API Service Client for Aynkaran Consultants Backend App Server
- * Automatically communicates with standard Express /api endpoint schema.
- */
-
+//frontend/src/services/api.js
 import API_URL from '../config/api';
 
 const API_BASE = API_URL ? `${API_URL}/api` : '/api';
@@ -174,5 +170,7 @@ export const apiService = {
     }
 
     return response.json();
-  }
+  },
+  deleteDocument: (id) => request(`/documents/${encodeURIComponent(id)}`, { method: 'DELETE' })
 };
+export default apiService;

@@ -1,7 +1,4 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+// backend/routes/recruitmentRoutes.js
 
 import { Router } from 'express';
 import { RecruitmentController } from '../controllers/recruitmentController.js';

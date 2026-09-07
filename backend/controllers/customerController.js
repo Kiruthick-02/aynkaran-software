@@ -1,8 +1,4 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
+//backend/controllers/customerController.js
 // Controller matching high density corporate client records using MongoDB Atlas
 export class CustomerController {
   constructor(db) {

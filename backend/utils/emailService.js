@@ -6,24 +6,44 @@
 import nodemailer from 'nodemailer';
 
 /**
+ * Interpolate template variables into message string
+ */
+function interpolate(templateStr, vars = {}) {
+  if (!templateStr) return '';
+  let result = templateStr;
+  for (const [key, value] of Object.entries(vars)) {
+    const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+    result = result.replace(regex, value !== undefined && value !== null ? String(value) : '');
+  }
+  return result;
+}
+
+/**
  * Production SMTP-based outbound email courier with TLS secure transmission
  */
-export async function sendEmailReceipt(toAddress, subject, bodyText, htmlAttachmentContent = null) {
-  const smtpHost = process.env.SMTP_HOST;
-  const smtpPort = process.env.SMTP_PORT || 587;
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASS;
-  const senderEmail = process.env.SENDER_EMAIL || smtpUser;
+export async function sendEmailReceipt(toAddress, subject, bodyText, htmlAttachmentContent = null, variables = {}, attachments = []) {
+  const smtpHost = process.env.SMTP_HOST?.trim();
+  const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+  const smtpUser = process.env.SMTP_USER?.trim();
+  const smtpPass = process.env.SMTP_PASSWORD?.trim() || process.env.SMTP_PASS?.trim();
+  const senderEmail = process.env.SMTP_FROM?.trim() || process.env.SENDER_EMAIL?.trim() || smtpUser;
+  const senderName = process.env.SMTP_FROM_NAME?.trim() || 'Aynkaran Consultants';
+  const isSecure = process.env.SMTP_SECURE === 'true' || smtpPort === 465;
+
+  const finalSubject = interpolate(subject, variables);
+  const finalBodyText = interpolate(bodyText, variables);
 
   if (!smtpHost || !smtpUser || !smtpPass) {
-    console.log('[Email Dispatcher] (Simulated) SMTP configuration keys are unassigned.');
+    console.log('[Email Dispatcher] (Simulation Mode) SMTP configuration keys are unassigned.');
     console.log(`[Email Target]: ${toAddress}`);
-    console.log(`[Email Subject]: ${subject}`);
-    console.log(`[Email Payload]: ${bodyText.slice(0, 120)}...`);
+    console.log(`[Email Subject]: ${finalSubject}`);
+    console.log(`[Email Payload]: ${finalBodyText.slice(0, 120)}...`);
     return { 
       status: 'simulated', 
       success: true, 
-      gateway: 'Simulation Mode - Define SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS to activate live email delivery.' 
+      simulated: true,
+      messageId: `sim-mail-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      gateway: 'Simulation Mode - Define SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD to activate live delivery.' 
     };
   }
 
@@ -31,8 +51,8 @@ export async function sendEmailReceipt(toAddress, subject, bodyText, htmlAttachm
     console.log(`[Email Dispatcher] Connecting via SMTP over TLS to ${smtpHost}:${smtpPort}...`);
     const transporter = nodemailer.createTransport({
       host: smtpHost,
-      port: parseInt(smtpPort, 10),
-      secure: parseInt(smtpPort, 10) === 465, // secure for port 465
+      port: smtpPort,
+      secure: isSecure,
       auth: {
         user: smtpUser,
         pass: smtpPass
@@ -40,19 +60,20 @@ export async function sendEmailReceipt(toAddress, subject, bodyText, htmlAttachm
     });
 
     const mailOptions = {
-      from: `"Aynkaran Consultants" <${senderEmail}>`,
+      from: `"${senderName}" <${senderEmail}>`,
       to: toAddress,
-      subject: subject,
-      text: bodyText,
-      html: htmlAttachmentContent ? htmlAttachmentContent : `
+      subject: finalSubject,
+      text: finalBodyText,
+      html: htmlAttachmentContent ? interpolate(htmlAttachmentContent, variables) : `
         <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 25px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #fafbfd; color: #1e293b;">
-          <h2 style="color: #4f46e5; margin-top: 0;">Aynkaran Consultants</h2>
-          <hr style="border: 0; h-px: 1px; background-color: #e2e8f0; margin: 15px 0;" />
-          <p style="font-size: 14px; line-height: 1.6; color: #334155;">${bodyText.replace(/\n/g, '<br>')}</p>
-          <hr style="border: 0; h-px: 1px; background-color: #e2e8f0; margin: 20px 0;" />
+          <h2 style="color: #4f46e5; margin-top: 0;">${senderName}</h2>
+          <hr style="border: 0; height: 1px; background-color: #e2e8f0; margin: 15px 0;" />
+          <p style="font-size: 14px; line-height: 1.6; color: #334155;">${finalBodyText.replace(/\n/g, '<br>')}</p>
+          <hr style="border: 0; height: 1px; background-color: #e2e8f0; margin: 20px 0;" />
           <span style="font-size: 11px; color: #64748b; display: block; text-align: center;">This is an automated notification alert from Aynkaran Business CRM. Please do not reply directly to this mailer.</span>
         </div>
-      `
+      `,
+      attachments: attachments || []
     };
 
     const deliveryReport = await transporter.sendMail(mailOptions);
@@ -65,8 +86,8 @@ export async function sendEmailReceipt(toAddress, subject, bodyText, htmlAttachm
       try {
         const transporter = nodemailer.createTransport({
           host: smtpHost,
-          port: parseInt(smtpPort, 10),
-          secure: parseInt(smtpPort, 10) === 465,
+          port: smtpPort,
+          secure: isSecure,
           auth: {
             user: smtpUser,
             pass: smtpPass
@@ -74,25 +95,26 @@ export async function sendEmailReceipt(toAddress, subject, bodyText, htmlAttachm
         });
         
         const sandboxMailOptions = {
-          from: `"Aynkaran Consultants" <${senderEmail}>`,
+          from: `"${senderName}" <${senderEmail}>`,
           to: 'kiruthickrn@gmail.com',
-          subject: `[Sandbox Redirect from ${toAddress}] ${subject}`,
-          text: `[ORIGINAL DESTINATION: ${toAddress}]\n\n${bodyText}`,
-          html: htmlAttachmentContent ? htmlAttachmentContent : `
+          subject: `[Sandbox Redirect from ${toAddress}] ${finalSubject}`,
+          text: `[ORIGINAL DESTINATION: ${toAddress}]\n\n${finalBodyText}`,
+          html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 25px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #fafbfd; color: #1e293b;">
               <div style="background-color: #fee2e2; border: 1px solid #fecaca; color: #991b1b; padding: 10px; border-radius: 6px; margin-bottom: 20px; font-size: 13px;">
-                <strong>Sandbox Interceptor Notification:</strong> This email was originally sent to <strong>${toAddress}</strong>, but has been safely redirected to your verified Elastic Email address to circumvent sandbox trial limits.
+                <strong>Sandbox Interceptor Notification:</strong> This email was originally sent to <strong>${toAddress}</strong>, but has been safely redirected to your verified email address to circumvent sandbox limits.
               </div>
-              <h2 style="color: #4f46e5; margin-top: 0;">Aynkaran Consultants</h2>
-              <hr style="border: 0; h-px: 1px; background-color: #e2e8f0; margin: 15px 0;" />
-              <p style="font-size: 14px; line-height: 1.6; color: #334155;">${bodyText.replace(/\n/g, '<br>')}</p>
-              <hr style="border: 0; h-px: 1px; background-color: #e2e8f0; margin: 20px 0;" />
+              <h2 style="color: #4f46e5; margin-top: 0;">${senderName}</h2>
+              <hr style="border: 0; height: 1px; background-color: #e2e8f0; margin: 15px 0;" />
+              <p style="font-size: 14px; line-height: 1.6; color: #334155;">${finalBodyText.replace(/\n/g, '<br>')}</p>
+              <hr style="border: 0; height: 1px; background-color: #e2e8f0; margin: 20px 0;" />
               <span style="font-size: 11px; color: #64748b; display: block; text-align: center;">This is an automated notification alert from Aynkaran Business CRM. Please do not reply directly to this mailer.</span>
             </div>
-          `
+          `,
+          attachments: attachments || []
         };
         const deliveryReport = await transporter.sendMail(sandboxMailOptions);
-        console.log(`[Email Dispatcher] Sandbox Redirect successfully delivery complete. MessageId: ${deliveryReport.messageId}`);
+        console.log(`[Email Dispatcher] Sandbox Redirect delivery complete. MessageId: ${deliveryReport.messageId}`);
         return { status: 'delivered', success: true, messageId: deliveryReport.messageId, redirected: true };
       } catch (retryErr) {
         console.error('[Email Dispatcher] Sandbox Redirect retry failed:', retryErr);

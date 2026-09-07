@@ -1,7 +1,4 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+// backend/routes/syncRoutes.js
 
 import express from 'express';
 

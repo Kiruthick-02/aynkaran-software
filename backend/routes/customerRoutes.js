@@ -1,7 +1,4 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+//backend/routes/customerRoutes.js
 
 import { Router } from 'express';
 import { CustomerController } from '../controllers/customerController.js';

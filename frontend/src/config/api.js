@@ -1,5 +1,6 @@
+//src/config/api.js
 // Central API configuration for production and development
-let baseUrl = import.meta.env.VITE_API_URL || '';
+let baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:7860';
 
 // Fallback to relative paths on active container instances (Google development/preview containers, localhost)
 if (typeof window !== 'undefined') {

@@ -10,6 +10,7 @@ import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { MongoClient } from 'mongodb';
 import { documentRoutes } from './backend/routes/documentRoutes.js';
+import { advisorRoutes } from './backend/routes/advisorRoutes.js';
 import { sendSMSNotification } from './backend/utils/smsService.js';
 import { sendEmailReceipt } from './backend/utils/emailService.js';
 
@@ -99,6 +100,13 @@ console.log("Using PORT =", PORT);
 
   // Initialize DB instance
   const db = loadDatabase();
+
+  // Keep advisor profile endpoints available in the root development server.
+  // The dedicated backend server exposes the same router, but Vite proxies
+  // local development requests here on port 7860.
+  if (mongoDbConnection) {
+    app.use('/api/advisors', advisorRoutes(mongoDbConnection));
+  }
 
   const activeOTPs = {};
 

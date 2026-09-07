@@ -16,7 +16,7 @@ export default defineConfig({
   },
 
   server: {
-    host: '0.0.0.0',
+    host: 'localhost',
     port: 5173,
     strictPort: true,
     allowedHosts: true,
@@ -24,12 +24,16 @@ export default defineConfig({
     watch: process.env.DISABLE_HMR === 'true' ? null : {},
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'http://127.0.0.1:7860',
         changeOrigin: true,
+        secure: false,
+        ws: false,
       },
       '/uploads': {
-        target: 'http://localhost:5000',
+        target: 'http://127.0.0.1:7860',
         changeOrigin: true,
+        secure: false,
+        ws: false,
       },
     },
   },
