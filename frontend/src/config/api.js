@@ -1,14 +1,6 @@
 //src/config/api.js
 // Central API configuration for production and development
-let baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:7860';
-
-// Fallback to relative paths on active container instances (Google development/preview containers, localhost)
-if (typeof window !== 'undefined') {
-  const host = window.location.hostname;
-  if (!host || host.includes('run.app') || host.includes('localhost') || host.includes('127.0.0.1')) {
-    baseUrl = '';
-  }
-}
+let baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // Fallback to relative paths on active container instances (Google development/preview containers, localhost)
 if (typeof window !== 'undefined') {
@@ -30,4 +22,27 @@ if (baseUrl) {
 }
 
 const API_URL = baseUrl;
+
+export function resolveApiUrl(value) {
+  if (!value) return value;
+
+  const stringValue = String(value);
+  if (/^(blob:|data:)/i.test(stringValue)) return stringValue;
+
+  if (/^https?:\/\//i.test(stringValue)) {
+    try {
+      const url = new URL(stringValue);
+      const isLocalApi =
+        ['localhost', '127.0.0.1'].includes(url.hostname) &&
+        ['5000', '7860'].includes(url.port);
+
+      return isLocalApi ? `${url.pathname}${url.search}${url.hash}` : stringValue;
+    } catch {
+      return stringValue;
+    }
+  }
+
+  return `${API_URL}${stringValue.startsWith('/') ? stringValue : `/${stringValue}`}`;
+}
+
 export default API_URL;

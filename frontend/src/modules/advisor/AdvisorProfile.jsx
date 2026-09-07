@@ -9,6 +9,7 @@ import {
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { advisorApi } from '../../services/advisorApi';
 import { apiService } from '../../services/api';
+import { resolveApiUrl } from '../../config/api';
 import AdvisorMilestoneTimeline from './AdvisorMilestoneTimeline';
 import DocumentPreviewModal from './DocumentPreviewModal';
 import AdvisorStatusModal from './AdvisorStatusModal';
@@ -45,10 +46,8 @@ const documentMatchesType = (doc, key) => {
   return keywords[key]?.some(word => text.includes(word));
 };
 
-const DOCUMENT_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7860';
 const resolveDocumentUrl = (value) => {
-  if (!value || /^(https?:|blob:|data:)/i.test(value)) return value;
-  return `${DOCUMENT_API_URL}${String(value).startsWith('/') ? value : `/${value}`}`;
+  return resolveApiUrl(value);
 };
 
 export default function AdvisorProfile({

@@ -24,13 +24,13 @@ export default defineConfig({
     watch: process.env.DISABLE_HMR === 'true' ? null : {},
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:7860',
+        target: 'http://127.0.0.1:5000',
         changeOrigin: true,
         secure: false,
         ws: false,
       },
       '/uploads': {
-        target: 'http://127.0.0.1:7860',
+        target: 'http://127.0.0.1:5000',
         changeOrigin: true,
         secure: false,
         ws: false,

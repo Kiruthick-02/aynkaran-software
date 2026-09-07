@@ -3,6 +3,7 @@ import React, { useState , useEffect } from 'react';
 import { Plus, X, Building2, ShieldCheck, User, MapPin, Sparkles, Check, HelpCircle, Calendar, Upload, Edit, Trash2 } from 'lucide-react';
 import { companyApi } from '../../services/companyApi'; 
 import { apiService } from '../../services/api';
+import API_URL from '../../config/api';
 
 import { createPortal } from 'react-dom';
 
@@ -67,7 +68,7 @@ function DocUploadZone({
   const [viewOpen, setViewOpen] = useState(false);
 
   const hasExisting = !!(existing?.path && !file);
-  const API = apiUrl || import.meta.env.VITE_API_URL || 'http://localhost:7860';
+  const API = apiUrl || API_URL;
   
 
   const href =
@@ -380,7 +381,6 @@ export default function CompaniesPoliciesModule({
   onShowNotification,
 }) 
 {
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7860';
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
 

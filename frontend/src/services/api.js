@@ -170,11 +170,7 @@ export const apiService = {
     }
 
     return response.json();
-<<<<<<< HEAD
   },
   deleteDocument: (id) => request(`/documents/${encodeURIComponent(id)}`, { method: 'DELETE' })
-=======
-  }
->>>>>>> d96c25bb403988716178a2b21910505a45607a70
 };
 export default apiService;

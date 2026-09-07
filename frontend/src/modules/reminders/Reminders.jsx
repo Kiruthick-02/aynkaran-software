@@ -78,13 +78,8 @@ export default function Reminders({ reminders = [], addReminder, updateReminder,
     <div className="space-y-6 text-slate-200">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-5">
         <div>
-<<<<<<< HEAD
           <h2 className="text-xl font-black tracking-tight text-white font-sans uppercase">Reminders & Broadcasting Console</h2>
           <p className="text-xs text-slate-400 font-medium">
-=======
-          <h2 className="text-xl font-bold tracking-tight text-slate-900 font-sans">Module 4: Automated Reminders & Broadcasting Console</h2>
-          <p className="text-xs text-slate-500 font-medium">
->>>>>>> d96c25bb403988716178a2b21910505a45607a70
             Monitor trigger schedules (1 month, 3 weeks, 2 weeks, 1 week, 3 days, and 1 day before) and dispatch announcements to clients & agents.
           </p>
         </div>
@@ -191,11 +186,7 @@ export default function Reminders({ reminders = [], addReminder, updateReminder,
                         {reminder.targetType}
                       </span>
                     </div>
-<<<<<<< HEAD
                     <p className="text-xs text-slate-400 mt-1">{reminder.description}</p>
-=======
-                    <p className="text-xs text-slate-600 mt-1">{reminder.description}</p>
->>>>>>> d96c25bb403988716178a2b21910505a45607a70
                     
                     {(reminder.customerMobile || reminder.customerEmail) && (
                       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] font-mono text-indigo-600 mt-1 px-2.5 py-1 rounded-lg w-fit border border-indigo-100/60 bg-indigo-50/50">

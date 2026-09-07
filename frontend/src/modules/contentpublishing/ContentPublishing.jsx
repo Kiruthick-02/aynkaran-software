@@ -18,8 +18,7 @@ import {
   ChevronDown,
   Plus,
 } from 'lucide-react';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7860';
+import API_URL from '../../config/api';
 
 const NEWS_CATEGORIES = [
   'Educational',

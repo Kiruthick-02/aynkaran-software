@@ -9,13 +9,12 @@ import {
 } from 'lucide-react';
 import { advisorApi } from '../../services/advisorApi';
 import { apiService } from '../../services/api';
+import { resolveApiUrl } from '../../config/api';
 import DocumentPreviewModal from './DocumentPreviewModal';
 import StageActivityPanel from './StageActivityPanel';
 
-const DOCUMENT_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7860';
 const resolveDocumentUrl = (value) => {
-  if (!value || /^(https?:|blob:|data:)/i.test(value)) return value;
-  return `${DOCUMENT_API_URL}${String(value).startsWith('/') ? value : `/${value}`}`;
+  return resolveApiUrl(value);
 };
 
 // The only milestones displayed in the candidate onboarding console.

@@ -20,44 +20,14 @@ import {
   Award,
   Filter
 } from 'lucide-react';
-<<<<<<< HEAD
 import { apiService } from '../../services/api';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7860';
+import API_URL, { resolveApiUrl } from '../../config/api';
 
 /** Build absolute URL for a stored path / blob / http link */
 function resolveUrl(path) {
   if (!path) return null;
-  const s = String(path);
-  if (s.startsWith('http') || s.startsWith('blob:') || s.startsWith('data:')) return s;
-  return `${API_URL}${s.startsWith('/') ? s : `/${s}`}`;
+  return resolveApiUrl(path);
 }
-=======
-import API_URL from '../../config/api';
-
-const getFileUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('data:')) return url;
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  return `${API_URL || ''}${url}`;
-};
-
-const cleanFileName = (filePathOrName) => {
-  if (!filePathOrName) return '';
-  const baseName = filePathOrName.includes('/') ? filePathOrName.substring(filePathOrName.lastIndexOf('/') + 1) : filePathOrName;
-  // Strip out leading numbers followed by hyphen or underscore (such as standard Multer timestamps Date.now())
-  return baseName.replace(/^\d+[-_]/, '');
-};
-
-export default function Documents({ candidates = [], customers = [] }) {
-  const { updateCandidate, updateCustomer, userRole } = useApp();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedVaultOwner, setSelectedVaultOwner] = useState(null);
-  const [previewDoc, setPreviewDoc] = useState(null);
-
-  const [corporateDocs, setCorporateDocs] = useState([]);
->>>>>>> d96c25bb403988716178a2b21910505a45607a70
 
 /** Collect document entries from a customer, candidate, or advisor object */
 function extractDocs(source, sourceType) {
@@ -89,7 +59,6 @@ function extractDocs(source, sourceType) {
     });
   };
 
-<<<<<<< HEAD
   push(
     'Aadhaar Card copy',
     source.aadhaarUrl || source.aadhaarFile || source.aadhaarDocUrl,
@@ -137,82 +106,6 @@ function extractDocs(source, sourceType) {
   const docArray = Array.isArray(source.documents)
     ? source.documents
     : (typeof source.documents === 'string' ? (JSON.parse(source.documents || '[]') || []) : []);
-=======
-  const handleDeleteCustomerDoc = (customerId, key) => {
-    if (!confirm('Are you sure you want to delete this customer document?')) return;
-    const cust = customers.find(c => c.id === customerId);
-    if (cust) {
-      const updatedKyc = { ...cust.kycDocuments };
-      delete updatedKyc[key];
-      const updatedDates = { ...cust.kycUploadDates };
-      delete updatedDates[key];
-      updateCustomer(customerId, { kycDocuments: updatedKyc, kycUploadDates: updatedDates });
-    }
-  };
-
-  const candidateDocs = userRole === 'Staff' ? [] : candidates.flatMap((c) =>
-    (c.documents || []).map((doc) => ({
-      id: doc.id,
-      candidateId: c.id,
-      name: cleanFileName(doc.name),
-      category: doc.category,
-      sourceName: c.name,
-      sourceType: 'Candidate',
-      uploadedAt: doc.uploadedAt?.split('T')[0] || new Date().toISOString().split('T')[0],
-      url: doc.url,
-    }))
-  );
-
-  const customerDocs = customers.flatMap((cust) => {
-    const list = [];
-    const getUploadDate = (key) => {
-      if (cust.kycUploadDates && cust.kycUploadDates[key]) {
-        return cust.kycUploadDates[key];
-      }
-      if (cust.createdAt) {
-        return cust.createdAt.split('T')[0];
-      }
-      return new Date().toISOString().split('T')[0];
-    };
-
-    if (cust.kycDocuments?.passportSizePhoto) {
-      const fullUrl = cust.kycDocuments.passportSizePhoto;
-      const fileName = fullUrl.startsWith('data:') ? 'Passport_Size_Photo.png' : cleanFileName(fullUrl);
-      list.push({ id: `${cust.id}-photo`, key: 'passportSizePhoto', customerId: cust.id, name: fileName, category: 'Passport Size Photo', sourceName: cust.name, sourceType: 'Customer', uploadedAt: getUploadDate('passportSizePhoto'), url: fullUrl });
-    }
-    if (cust.kycDocuments?.aadhaarCard) {
-      const fullUrl = cust.kycDocuments.aadhaarCard;
-      const fileName = fullUrl.startsWith('data:') ? 'Aadhaar_Document.png' : cleanFileName(fullUrl);
-      list.push({ id: `${cust.id}-aadhaar`, key: 'aadhaarCard', customerId: cust.id, name: fileName, category: 'Aadhaar Card', sourceName: cust.name, sourceType: 'Customer', uploadedAt: getUploadDate('aadhaarCard'), url: fullUrl });
-    }
-    if (cust.kycDocuments?.panCard) {
-      const fullUrl = cust.kycDocuments.panCard;
-      const fileName = fullUrl.startsWith('data:') ? 'PAN_Document.png' : cleanFileName(fullUrl);
-      list.push({ id: `${cust.id}-pan`, key: 'panCard', customerId: cust.id, name: fileName, category: 'PAN Card', sourceName: cust.name, sourceType: 'Customer', uploadedAt: getUploadDate('panCard'), url: fullUrl });
-    }
-    if (cust.kycDocuments?.incomeProof) {
-      const fullUrl = cust.kycDocuments.incomeProof;
-      const fileName = fullUrl.startsWith('data:') ? 'Income_Proof.png' : cleanFileName(fullUrl);
-      list.push({ id: `${cust.id}-income`, key: 'incomeProof', customerId: cust.id, name: fileName, category: 'Income Proof', sourceName: cust.name, sourceType: 'Customer', uploadedAt: getUploadDate('incomeProof'), url: fullUrl });
-    }
-    if (cust.kycDocuments?.educationCertificate) {
-      const fullUrl = cust.kycDocuments.educationCertificate;
-      const fileName = fullUrl.startsWith('data:') ? 'Education_Certificate.png' : cleanFileName(fullUrl);
-      list.push({ id: `${cust.id}-edu`, key: 'educationCertificate', customerId: cust.id, name: fileName, category: 'Education Certificate', sourceName: cust.name, sourceType: 'Customer', uploadedAt: getUploadDate('educationCertificate'), url: fullUrl });
-    }
-    if (cust.kycDocuments?.signatureCopy) {
-      const fullUrl = cust.kycDocuments.signatureCopy;
-      const fileName = fullUrl.startsWith('data:') ? 'Signature_Specimen.png' : cleanFileName(fullUrl);
-      list.push({ id: `${cust.id}-signature`, key: 'signatureCopy', customerId: cust.id, name: fileName, category: 'Signature Specimen Scan', sourceName: cust.name, sourceType: 'Customer', uploadedAt: getUploadDate('signatureCopy'), url: fullUrl });
-    }
-    if (cust.kycDocuments?.passport) {
-      const fullUrl = cust.kycDocuments.passport;
-      const fileName = fullUrl.startsWith('data:') ? 'Indian_Passport.png' : cleanFileName(fullUrl);
-      list.push({ id: `${cust.id}-passport`, key: 'passport', customerId: cust.id, name: fileName, category: 'Indian Passport Copy', sourceName: cust.name, sourceType: 'Customer', uploadedAt: getUploadDate('passport'), url: fullUrl });
-    }
-    return list;
-  });
->>>>>>> d96c25bb403988716178a2b21910505a45607a70
 
   if (Array.isArray(docArray)) {
     docArray.forEach((d, i) => {
@@ -237,7 +130,6 @@ function extractDocs(source, sourceType) {
     });
   }
 
-<<<<<<< HEAD
   // Nested kycDocuments object (backend schema)
   if (source.kycDocuments && typeof source.kycDocuments === 'object') {
     Object.entries(source.kycDocuments).forEach(([key, path]) => {
@@ -248,41 +140,6 @@ function extractDocs(source, sourceType) {
 
   return docs;
 }
-=======
-  const filtered = fullDocumentsPool.filter((doc) => {
-    const matchesSearch = (doc.name || '').toLowerCase().includes((searchQuery || '').toLowerCase()) || (doc.sourceName || '').toLowerCase().includes((searchQuery || '').toLowerCase());
-    let matchesCategory = false;
-    if (selectedCategory === 'all') {
-      matchesCategory = true;
-    } else if (selectedCategory.toLowerCase() === 'customer' || selectedCategory.toLowerCase() === 'candidate') {
-      matchesCategory = doc.sourceType.toLowerCase() === selectedCategory.toLowerCase();
-    } else {
-      const docCatLower = doc.category.toLowerCase();
-      const selCatLower = selectedCategory.toLowerCase();
-      if (selCatLower === 'passport') {
-        matchesCategory = docCatLower.includes('indian passport');
-      } else if (selCatLower === 'photo') {
-        matchesCategory = docCatLower.includes('passport size photo') || docCatLower === 'photo';
-      } else {
-        matchesCategory = docCatLower.includes(selCatLower);
-      }
-    }
-    const matchesOwner = !selectedVaultOwner || (doc.sourceType === 'Candidate' ? doc.candidateId === selectedVaultOwner : doc.customerId === selectedVaultOwner);
-    return matchesSearch && matchesCategory && matchesOwner;
-  });
-
-  const owners = [
-      ...(userRole === 'Staff' ? [] : candidates.map(c => ({ id: c.id, name: c.name, type: 'Agent', photo: c.profilePicture }))),
-      ...customers.map(c => ({ id: c.id, name: c.name, type: 'Customer', photo: c.kycDocuments?.passportSizePhoto }))
-    ];
-
-  const customerOwners = owners.filter(o => o.type === 'Customer');
-  const agentOwners = owners.filter(o => o.type === 'Agent');
-
-  const handleUploadCorpDoc = (e) => {
-    e.preventDefault();
-    if (!newCorpName) return;
->>>>>>> d96c25bb403988716178a2b21910505a45607a70
 
 /** Map category label → field name(s) to clear on the source record */
 const CATEGORY_TO_FIELDS = {
@@ -536,7 +393,6 @@ export default function Documents({
       {/* Title */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 pb-5">
         <div>
-<<<<<<< HEAD
           <h2 className="text-xl font-bold tracking-tight text-white font-sans flex items-center gap-2">
             <span>Consolidated Document Vault & KYC Repository</span>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-mono border border-blue-500/30">
@@ -545,11 +401,6 @@ export default function Documents({
           </h2>
           <p className="text-xs text-slate-400 font-medium mt-1">
             Centralized document storage for Customers, Agent Trainees, and Active Insurance Advisors.
-=======
-          <h2 className="text-xl font-bold tracking-tight text-slate-900 font-sans">Module 6: Secure Document Vault</h2>
-          <p className="text-xs text-slate-500 font-medium">
-            Central repository inspecting candidate training forms, client KYC documents, and agency templates safely.
->>>>>>> d96c25bb403988716178a2b21910505a45607a70
           </p>
         </div>
 
@@ -564,7 +415,6 @@ export default function Documents({
         </button>
       </div>
 
-<<<<<<< HEAD
       {/* Horizontal Folder Filters Bar */}
       <div className="bg-[#1e293b] p-5 rounded-3xl border border-slate-800 shadow-xl space-y-4">
         {/* 1. Customer KYC Folders */}
@@ -613,123 +463,6 @@ export default function Documents({
                 </button>
               );
             })}
-=======
-      <div className="space-y-4">
-        {/* Profile Icons Filter Bar */}
-        <div className="bg-white p-4 border border-slate-200 rounded-2xl shadow-sm space-y-6">
-          <div className="flex justify-between items-center">
-             <h3 className="font-bold text-xs text-slate-700 uppercase tracking-wider">Filter by Owner</h3>
-             <button
-               onClick={() => setSelectedVaultOwner(null)}
-               className={`text-[10px] font-bold px-3 py-1 rounded-full border ${!selectedVaultOwner ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-slate-50 border-slate-200 text-slate-600'}`}
-            >
-                Clear Filter
-            </button>
-          </div>
-
-          <div className="space-y-4">
-             <div className="space-y-2">
-                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Customers</h4>
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-                  {customerOwners.map(owner => (
-                    <button
-                      key={owner.id}
-                      onClick={() => setSelectedVaultOwner(owner.id)}
-                      className={`flex items-center space-x-2 px-3 py-1.5 rounded-full border transition-all shrink-0 ${
-                        selectedVaultOwner === owner.id
-                          ? 'bg-indigo-50 border-indigo-400 text-indigo-700 ring-2 ring-indigo-500/10 font-bold'
-                          : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
-                      }`}
-                      title={owner.name}
-                    >
-                      <div className="w-6 h-6 rounded-full overflow-hidden bg-white border border-slate-200/80 shrink-0">
-                          <img
-                              src={owner.photo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(owner.name)}`}
-                              alt={owner.name}
-                              className="w-full h-full object-cover"
-                              referrerPolicy="no-referrer"
-                          />
-                      </div>
-                      <span className="text-[11px] truncate max-w-[90px]">{owner.name}</span>
-                    </button>
-                  ))}
-                  {customerOwners.length === 0 && (
-                     <span className="text-[11px] text-slate-400 italic">No customers registered.</span>
-                  )}
-                </div>
-             </div>
-
-             {userRole !== 'Staff' && (
-               <>
-                 <hr className="border-slate-100" />
-
-                 <div className="space-y-2">
-                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Agents</h4>
-                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-                      {agentOwners.map(owner => (
-                        <button
-                          key={owner.id}
-                          onClick={() => setSelectedVaultOwner(owner.id)}
-                          className={`flex items-center space-x-2 px-3 py-1.5 rounded-full border transition-all shrink-0 ${
-                            selectedVaultOwner === owner.id
-                              ? 'bg-indigo-50 border-indigo-400 text-indigo-700 ring-2 ring-indigo-500/10 font-bold'
-                              : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
-                          }`}
-                          title={owner.name}
-                        >
-                          <div className="w-6 h-6 rounded-full overflow-hidden bg-white border border-slate-200/80 shrink-0">
-                              <img
-                                  src={owner.photo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(owner.name)}`}
-                                  alt={owner.name}
-                                  className="w-full h-full object-cover"
-                                  referrerPolicy="no-referrer"
-                              />
-                          </div>
-                          <span className="text-[11px] truncate max-w-[90px]">{owner.name}</span>
-                        </button>
-                      ))}
-                      {agentOwners.length === 0 && (
-                         <span className="text-[11px] text-slate-400 italic">No agents registered.</span>
-                      )}
-                    </div>
-                 </div>
-               </>
-             )}
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="bg-white p-4 border border-slate-200 rounded-2xl shadow-sm flex flex-col md:flex-row gap-3">
-            <div className="relative flex-1 text-xs">
-              <input
-                id="search-documents-input"
-                type="text"
-                placeholder="Search by Document Name, Customer, or Candidate..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-9 pr-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 hover:border-slate-350 transition-colors"
-              />
-              <Search className="absolute left-3 top-2.5 text-slate-400" size={14} />
-            </div>
-
-            <select
-              id="selected-category-filter"
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 hover:border-slate-350 transition-colors cursor-pointer"
-            >
-              <option value="all">-- All Documents --</option>
-              <option value="Customer">Customer KYC Documents Only</option>
-              {userRole !== 'Staff' && <option value="Candidate">Candidate Training Documents Only</option>}
-              <option value="Aadhaar">Aadhaar Card copy</option>
-              <option value="PAN">PAN Card copy</option>
-              <option value="photo">Passport Size Photo</option>
-              <option value="Income">Income Proof certificate</option>
-              <option value="Education">Education Certificate</option>
-              <option value="Signature">Signature Specimen scan</option>
-              <option value="Passport">Indian Passport Copy</option>
-            </select>
->>>>>>> d96c25bb403988716178a2b21910505a45607a70
           </div>
         </div>
 
@@ -946,7 +679,6 @@ export default function Documents({
                     >
                       <Eye className="w-4 h-4" />
                     </button>
-<<<<<<< HEAD
                     {doc.url && (
                       <a
                         href={doc.url}
@@ -964,13 +696,6 @@ export default function Documents({
                       onClick={() => handleDeleteDoc(doc)}
                       className="p-2 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 transition cursor-pointer"
                       title="Delete document"
-=======
-                    <a
-                      href={doc.url ? getFileUrl(doc.url) : `data:text/plain;charset=utf-8,${encodeURIComponent('Aynkaran Consultants - Vault File: ' + doc.name)}`}
-                      download={doc.name}
-                      className="p-1.5 border border-slate-200 hover:bg-indigo-50 text-indigo-600 rounded-lg transition-colors cursor-pointer"
-                      title={doc.url ? "Download document" : "Download simulation"}
->>>>>>> d96c25bb403988716178a2b21910505a45607a70
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -1038,7 +763,6 @@ export default function Documents({
               )}
             </div>
 
-<<<<<<< HEAD
             <div className="flex items-center justify-between px-6 py-4 bg-[#1e293b] border-t border-slate-800 shrink-0">
               <div className="text-xs text-slate-400 font-mono">
                 Status: <strong className="text-white">{previewDoc.verificationStatus || 'Uploaded'}</strong>
@@ -1056,84 +780,6 @@ export default function Documents({
                     <span>Download</span>
                   </a>
                 )}
-=======
-        <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-2 text-xs">
-          <p className="font-extrabold text-slate-800 flex items-center space-x-1.5">
-            <ShieldCheck size={16} className="text-emerald-600" />
-            <span>Compliant & Encrypted Storage</span>
-          </p>
-          <p className="text-slate-500 leading-relaxed text-[11px]">
-            Every administrative file uploaded to Aynkaran Consultants is cached in the local sandbox matching IRDAI strict compliance parameters. Offline file signatures are checked at startup.
-          </p>
-        </div>
-      </div>
-
-      {previewDoc && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 p-6 overflow-hidden">
-            <div className="flex justify-between items-start border-b border-slate-100 pb-3 mb-4">
-              <div>
-                <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono font-bold">
-                  PREVIEW: {previewDoc.id}
-                </span>
-                <h3 className="font-extrabold text-base text-slate-800 mt-2">{previewDoc.name}</h3>
-              </div>
-              <button
-                onClick={() => setPreviewDoc(null)}
-                className="text-slate-400 hover:text-slate-600 font-extrabold text-xs"
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="bg-slate-50 rounded-xl p-4 border border-dashed border-slate-200/80 flex items-center justify-center min-h-[300px]">
-              {previewDoc.url ? (
-                previewDoc.url.startsWith('data:image/') || previewDoc.url.match(/\.(jpeg|jpg|gif|png)$/i) || (previewDoc.url.includes('/uploads/') && !previewDoc.url.includes('.pdf')) ? (
-                      <img
-                    src={getFileUrl(previewDoc.url)}
-                    alt={previewDoc.name}
-                    className="max-w-full max-h-[50vh] object-contain rounded-lg shadow-sm"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => { e.target.src = 'https://api.dicebear.com/7.x/initials/svg?seed=Err'; }}
-                  />
-                ) : previewDoc.url.startsWith('data:application/pdf') || previewDoc.url.includes('.pdf') ? (
-                  <iframe
-                    src={getFileUrl(previewDoc.url)}
-                    title={previewDoc.name}
-                    className="w-full h-[55vh] rounded-lg border-0 bg-white"
-                    allowFullScreen
-                  />
-                ) : (
-                  <div className="text-center space-y-4 py-8">
-                    <div className="w-16 h-16 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto shadow-sm">
-                      <FileText size={28} />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="font-extrabold text-xs text-slate-700">Digital Copy Verified</p>
-                      <p className="text-[11px] text-slate-400">File Type doesn't support inline visual rendering.</p>
-                      <p className="text-[11px] text-emerald-700 font-bold">SHA-256 Checksum: Verified</p>
-                    </div>
-                  </div>
-                )
-              ) : (
-                <div className="text-center space-y-4 py-8">
-                  <div className="w-16 h-16 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto shadow-sm">
-                    <FileText size={28} />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-extrabold text-xs text-slate-700">Digital Authenticity Verified</p>
-                    <p className="text-[11px] text-slate-400 font-mono font-bold text-indigo-600">{previewDoc.id}</p>
-                    <p className="text-[11px] text-slate-400">Owner: {previewDoc.sourceName} • Category: {previewDoc.category}</p>
-                    <p className="text-[11px] text-emerald-700 font-bold">SHA-256 Checksum: Success (0xACF728...)</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-between items-center mt-5 pt-3 border-t border-slate-100">
-              <p className="text-[10px] text-slate-400 font-mono">Released {previewDoc.uploadedAt}</p>
-              <div className="flex space-x-2">
->>>>>>> d96c25bb403988716178a2b21910505a45607a70
                 <button
                   type="button"
                   onClick={() => setPreviewDoc(null)}
@@ -1141,18 +787,6 @@ export default function Documents({
                 >
                   Close
                 </button>
-<<<<<<< HEAD
-=======
-                <a
-                  href={previewDoc.url ? getFileUrl(previewDoc.url) : `data:text/plain;charset=utf-8,${encodeURIComponent('Aynkaran Consultants - Vault File: ' + previewDoc.name)}`}
-                  download={previewDoc.name}
-                  onClick={() => setPreviewDoc(null)}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow cursor-pointer text-center flex items-center space-x-1"
-                >
-                  <Download size={13} />
-                  <span>Download file</span>
-                </a>
->>>>>>> d96c25bb403988716178a2b21910505a45607a70
               </div>
             </div>
           </div>
