@@ -61,6 +61,7 @@ export default function ReportSystem({
     ],
     recruitment: [
       { id: 'id', label: 'Candidate ID', default: true },
+      { id: 'traineeId', label: 'Trainee ID', default: true },
       { id: 'name', label: 'Candidate Name', default: true },
       { id: 'mobile', label: 'Mobile No.', default: true },
       { id: 'email', label: 'Email address', default: true },
@@ -68,6 +69,10 @@ export default function ReportSystem({
       { id: 'appFeeStatus', label: 'App Fee Status', default: false },
       { id: 'trainFeeStatus', label: 'Training Fee Status', default: false },
       { id: 'examScore', label: 'Exam Score', default: true },
+      { id: 'certificationResult', label: 'Certification Result', default: true },
+      { id: 'examDecision', label: 'Exam Decision', default: true },
+      { id: 'examDecisionDate', label: 'Decision Date', default: false },
+      { id: 'examRetakeCount', label: 'Retake Count', default: false },
       { id: 'agentCode', label: 'Agent Code', default: true },
     ],
     policy: [
@@ -172,6 +177,7 @@ export default function ReportSystem({
     } else if (reportType === 'recruitment') {
       result = candidates.map(cand => ({
         id: cand.id,
+        traineeId: cand.traineeId || 'Pending Stage 2',
         name: cand.name,
         mobile: cand.mobile || 'N/A',
         email: cand.email || 'N/A',
@@ -179,6 +185,10 @@ export default function ReportSystem({
         appFeeStatus: cand.fees?.applicationFeePaid ? 'Paid' : 'Pending',
         trainFeeStatus: cand.fees?.trainingFeePaid ? 'Paid' : 'Pending',
         examScore: cand.exam?.score || 0,
+        certificationResult: cand.result || cand.examResultStatus || 'Pending',
+        examDecision: cand.examDecision || 'Pending',
+        examDecisionDate: cand.examDecisionDate || 'N/A',
+        examRetakeCount: cand.examRetakeCount || 0,
         agentCode: cand.exam?.agentCodeGenerated || 'Pending',
       }));
 

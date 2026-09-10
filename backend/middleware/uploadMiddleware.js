@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const ROOT_UPLOADS = path.join(process.cwd(), 'uploads');
+const ROOT_UPLOADS = path.join(__dirname, '..', 'uploads');
 
 // Ensure base folders exist
 [
@@ -49,6 +49,10 @@ function resolveFolder(targetType) {
   }
 
   if (type === 'company' || type === 'companies') {
+    return 'companies';
+  }
+
+  if (type === 'policy' || type === 'policies' || type === 'brochure') {
     return 'companies';
   }
 

@@ -61,6 +61,7 @@ export class RecruitmentController {
       const { id } = req.params;
       const data = { ...req.body };
       delete data._id; // _id must be immutable
+      delete data.id;
 
       if (data.stageNumber) {
         data.stageNumber = Number(data.stageNumber);

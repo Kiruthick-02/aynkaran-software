@@ -1,10 +1,12 @@
 // frontend/src/modules/advisor/EditCandidateModal.jsx
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import {
   X, Check, User, Phone, Mail, MapPin, Calendar, Camera,
   Building, Award, Upload, AlertCircle, Sparkles, FileText
 } from 'lucide-react';
 import { advisorApi } from '../../services/advisorApi';
+import { validateCandidateFields } from './candidateValidation';
 
 export default function EditCandidateModal({
   isOpen,
@@ -89,8 +91,9 @@ export default function EditCandidateModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.mobile.trim()) {
-      setErrorMsg('Candidate Name and Mobile Number are required.');
+    const validationError = validateCandidateFields(formData);
+    if (validationError) {
+      setErrorMsg(validationError);
       return;
     }
 
@@ -143,9 +146,9 @@ export default function EditCandidateModal({
     }
   };
 
-  return (
-    <div className="absolute inset-0 z-[220] flex min-h-[calc(100vh-7rem)] items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="relative flex flex-col w-full max-w-3xl max-h-[calc(100vh-7rem)] bg-[#0f172a] border border-slate-700 rounded-3xl shadow-2xl overflow-hidden">
+  const modalContent = (
+    <div className="fixed inset-0 z-[99999] flex min-h-screen items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in">
+      <div className="relative flex flex-col w-full max-w-3xl max-h-[calc(100vh-2rem)] bg-[#0f172a] border border-slate-700 rounded-3xl shadow-2xl overflow-hidden animate-scale-up">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-[#1e293b] border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-3">
@@ -157,7 +160,7 @@ export default function EditCandidateModal({
                 Edit Trainee Candidate Profile
               </h3>
               <p className="text-xs text-slate-400 font-mono">
-                Candidate ID: {candidate.id} • {candidate.currentStage || 'Stage 1'}
+                Trainee ID: {candidate.traineeId || 'Pending Stage 2 entry'} • {candidate.currentStage || 'Stage 1'}
               </p>
             </div>
           </div>
@@ -253,7 +256,7 @@ export default function EditCandidateModal({
                     type="text"
                     required
                     value={formData.name}
-                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    onChange={e => setFormData({ ...formData, name: e.target.value.replace(/[^A-Za-z ]/g, '') })}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-xs focus:outline-none focus:border-blue-500"
                   />
                 </div>
@@ -262,9 +265,12 @@ export default function EditCandidateModal({
                   <label className="text-[10px] uppercase font-bold text-slate-400 block">Primary Mobile Number *</label>
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={10}
                     required
                     value={formData.mobile}
-                    onChange={e => setFormData({ ...formData, mobile: e.target.value })}
+                    onChange={e => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '') })}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs focus:outline-none focus:border-blue-500"
                   />
                 </div>
@@ -273,8 +279,11 @@ export default function EditCandidateModal({
                   <label className="text-[10px] uppercase font-bold text-slate-400 block">Alternate Mobile</label>
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={15}
                     value={formData.alternateMobile}
-                    onChange={e => setFormData({ ...formData, alternateMobile: e.target.value })}
+                    onChange={e => setFormData({ ...formData, alternateMobile: e.target.value.replace(/\D/g, '') })}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs focus:outline-none focus:border-blue-500"
                   />
                 </div>
@@ -332,92 +341,10 @@ export default function EditCandidateModal({
               </div>
             </div>
 
-            {/* 3. Educational & Carrier Preferences */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-slate-800 pb-2">
-                2. Educational & Sponsor Affiliation
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-semibold text-slate-300">
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-slate-400 block">Highest Qualification</label>
-                  <input
-                    type="text"
-                    value={formData.qualification}
-                    onChange={e => setFormData({ ...formData, qualification: e.target.value })}
-                    placeholder="e.g. B.Com, MBA, 12th Pass"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-xs focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-slate-400 block">Current Occupation</label>
-                  <input
-                    type="text"
-                    value={formData.occupation}
-                    onChange={e => setFormData({ ...formData, occupation: e.target.value })}
-                    placeholder="e.g. Sales Executive, Business"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-xs focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-slate-400 block">Insurance Partner Company</label>
-                  <select
-                    value={formData.insuranceCompany}
-                    onChange={e => setFormData({ ...formData, insuranceCompany: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-xs focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="SBI Life Insurance">SBI Life Insurance</option>
-                    <option value="HDFC Life Insurance">HDFC Life Insurance</option>
-                    <option value="Care Health Insurance">Care Health Insurance</option>
-                    <option value="Bajaj General Insurance">Bajaj General Insurance</option>
-                    <option value="LIC of India">LIC of India</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-slate-400 block">Referral Sponsor Name</label>
-                  <input
-                    type="text"
-                    value={formData.referralName}
-                    onChange={e => setFormData({ ...formData, referralName: e.target.value })}
-                    placeholder="Referral Person"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-xs focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-slate-400 block">Referral Contact</label>
-                  <input
-                    type="tel"
-                    value={formData.referralContact}
-                    onChange={e => setFormData({ ...formData, referralContact: e.target.value })}
-                    placeholder="Contact Number"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-slate-400 block">Recruitment Source</label>
-                  <select
-                    value={formData.source}
-                    onChange={e => setFormData({ ...formData, source: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-xs focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="Direct Walk-in">Direct Walk-in</option>
-                    <option value="Advisor Referral">Advisor Referral</option>
-                    <option value="Campus Recruitment">Campus Recruitment</option>
-                    <option value="Digital Media Campaign">Digital Media Campaign</option>
-                    <option value="Job Portal">Job Portal</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
             {/* 4. Residential Address */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-slate-800 pb-2">
-                3. Residential Address
+                2. Residential Address
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs font-semibold text-slate-300">
                 <div className="space-y-1 sm:col-span-4">
@@ -507,4 +434,6 @@ export default function EditCandidateModal({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? ReactDOM.createPortal(modalContent, document.body) : modalContent;
 }

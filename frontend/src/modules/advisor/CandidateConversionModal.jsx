@@ -159,7 +159,7 @@ export default function CandidateConversionModal({
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
           <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
             <div>
-              <p className="text-[10px] font-mono text-slate-500 uppercase">Origin Candidate ID: {candidate.id}</p>
+              <p className="text-[10px] font-mono text-slate-500 uppercase">Trainee ID: {candidate.traineeId || 'Pending Stage 2 entry'}</p>
               <h4 className="text-sm font-bold text-white mt-0.5">{candidate.name}</h4>
               <p className="text-slate-400">{candidate.mobile} • {candidate.email || 'No email'}</p>
             </div>

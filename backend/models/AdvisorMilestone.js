@@ -10,10 +10,10 @@ export const MILESTONE_STAGES = [
   ['DOSSIER_KYC_COMPLETED', 'Dossier Scans and KYC Completed', 'Collect and verify all mandatory KYC documents.', 'All required documents must be present and verified.'],
   ['PRL_APPLICATION_DONE', 'PRL Application Done', 'Record the PRL application and its reference.', 'PRL application must be completed.'],
   ['PRL_VERIFICATION_FEE_CLEARED', 'PRL Verification Fee Cleared', 'Record the PRL verification fee payment.', 'Payment status must be Paid.'],
-  ['IRDAI_PORTALS_TRAINING_ENROLLED', 'IRDAI Portals Training Enrolled', 'Record IRDAI portal training enrollment.', 'Training enrollment must be completed.'],
+  ['IRDAI_PORTALS_TRAINING_ENROLLED', 'Training Enrolled', 'Record IRDAI portal training enrollment.', 'Training enrollment must be completed.'],
   ['TRAINING_LICENSE_FEE_PAID', 'Training License Fee Paid', 'Record the training/license fee payment.', 'Payment status must be Paid.'],
-  ['NSEIT_EXAM_REGISTERED', 'NSEIT Exam Registered', 'Record NSEIT exam registration and fee payment.', 'Registration details and required fee payment must be complete.'],
-  ['IRDAI_CARRIER_CERTIFICATION_PASSED', 'IRDAI Carrier Certification Passed', 'Record the certification result and evidence.', 'Result must be Passed.'],
+  ['NSEIT_EXAM_REGISTERED', 'Exam Registered', 'Record exam registration and fee payment.', 'Registration details and required fee payment must be complete.'],
+  ['IRDAI_CARRIER_CERTIFICATION_PASSED', 'Exam Passed', 'Record the certification result and evidence.', 'Result must be Passed.'],
   ['ACTIVE_AYNKARAN_LICENSE_GENERATED', 'Active Aynkaran License Generated', 'Generate and save the active Aynkaran advisor license/code.', 'Active advisor license/code must be generated.']
 ].map(([key, name, purpose, completionConditions], index) => ({
   stage: index + 1, key, name, purpose, activities: [],

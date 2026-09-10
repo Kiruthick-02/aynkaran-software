@@ -2,6 +2,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { syncRoutes } from './routes/syncRoutes.js';
 import { customerRoutes } from './routes/customerRoutes.js';
 import { recruitmentRoutes } from './routes/recruitmentRoutes.js';
@@ -13,6 +14,10 @@ import { documentRoutes } from './routes/documentRoutes.js';
 import { enquiryRoutes } from './routes/enquiryRoutes.js';
 import { contentRoutes } from './routes/contentRoutes.js';
 import { advisorRoutes } from './routes/advisorRoutes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const ROOT_UPLOADS = path.join(__dirname, 'uploads');
 
 export function createExpressApp(db) {
   const app = express();
@@ -53,7 +58,8 @@ export function createExpressApp(db) {
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // Serve document uploads
-  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+  app.use('/uploads', express.static(ROOT_UPLOADS));
+  app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
   /**
    * ==========================================

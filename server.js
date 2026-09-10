@@ -93,6 +93,7 @@ console.log("Using PORT =", PORT);
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // Serve document uploads statically
+  app.use('/uploads', express.static(path.join(process.cwd(), 'backend', 'uploads')));
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   // Initialize DB instance
@@ -963,7 +964,9 @@ Aynkaran Business CRM Autopilot`;
         list = await mongoDbConnection.collection('reminders').find().toArray();
         list = list.map(r => ({ ...r, _id: undefined }));
       } catch (err) {
-        return res.status(500).json({ error: err.message });
+        console.error('[Reminders] MongoDB unavailable, using local cache:', err.message);
+        mongoDbConnection = null;
+        list = db.reminders || [];
       }
     } else {
       list = db.reminders || [];

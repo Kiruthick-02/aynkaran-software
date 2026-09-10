@@ -604,7 +604,7 @@ export default function AdvisorProfile({
                           </a>
                           <label className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer transition">
                             <Upload className="w-3 h-3" /> Replace
-                            <input type="file" accept="image/*,application/pdf" className="hidden" onChange={event => handleFilePicked(event, doc.category || 'Advisor Document')} />
+                            <input type="file" accept="image/*,application/pdf" className="hidden" onChange={event => handleFilePicked(event, doc.category || type.name)} />
                           </label>
                         </div>
 

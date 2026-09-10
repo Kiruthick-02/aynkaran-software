@@ -601,7 +601,7 @@ export default function Recruitment({ candidates = [], addCandidate, updateCandi
                           },
                           { 
                             id: 3, 
-                            label: 'Dossier Scans and KYC Completed', 
+                            label: 'Document Scans and KYC Completed', 
                             desc: (selectedCandidate.documents || []).length > 0 ? `${(selectedCandidate.documents || []).length} digital documents captured` : 'Waiting for documents attachment', 
                             done: (selectedCandidate.documents || []).length > 0 
                           },
@@ -619,7 +619,7 @@ export default function Recruitment({ candidates = [], addCandidate, updateCandi
                           },
                           { 
                             id: 6, 
-                            label: 'IRDAI Portals Training Enrolled', 
+                            label: 'Training Enrolled', 
                             desc: RECRUITMENT_STAGES.indexOf(selectedCandidate.currentStage) >= 6 ? 'Online modules active' : 'Training wait phase', 
                             done: RECRUITMENT_STAGES.indexOf(selectedCandidate.currentStage) >= 6 
                           },
@@ -631,13 +631,13 @@ export default function Recruitment({ candidates = [], addCandidate, updateCandi
                           },
                           { 
                             id: 8, 
-                            label: 'NSEIT Exam Registered', 
+                            label: 'Exam Registered', 
                             desc: selectedCandidate.fees?.examFeePaid ? `Exam fee ₹${selectedCandidate.fees?.examFeeAmount} registered` : 'Exam registration/fee pending', 
                             done: !!selectedCandidate.fees?.examFeePaid || RECRUITMENT_STAGES.indexOf(selectedCandidate.currentStage) >= 8 
                           },
                           { 
                             id: 9, 
-                            label: 'IRDAI Carrier Certification Passed', 
+                            label: 'Exam Passed', 
                             desc: selectedCandidate.exam?.result === 'Pass' ? `Passed Score: ${selectedCandidate.exam.score || 35}/50` : 'Result not certified yet', 
                             done: selectedCandidate.exam?.result === 'Pass' || RECRUITMENT_STAGES.indexOf(selectedCandidate.currentStage) >= 10 
                           },
@@ -1063,7 +1063,7 @@ export default function Recruitment({ candidates = [], addCandidate, updateCandi
                         {/* Exam Fees Box */}
                         <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs flex justify-between items-center">
                           <div className="space-y-0.5">
-                            <p className="text-[10.5px] text-slate-500 font-extrabold">IRDAI Exam Fee (NSEIT)</p>
+                            <p className="text-[10.5px] text-slate-500 font-extrabold">IRDAI Exam Fee</p>
                             <p className="text-xs text-slate-400">Manual Entry Registration Fee</p>
                             <p className="font-extrabold text-slate-900 text-base mt-1">
                               ₹{selectedCandidate.fees?.examFeeAmount || '0 (Not Entered)'}

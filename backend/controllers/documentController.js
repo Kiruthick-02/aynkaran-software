@@ -1,6 +1,11 @@
 // backend/controllers/documentController.js
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const ROOT_UPLOADS = path.join(__dirname, '..', 'uploads');
 
 /**
  * Map frontend category → fields stored on the customer document
@@ -419,7 +424,7 @@ export class DocumentController {
     try {
       const { filename, targetType } = req.params;
       const folder = resolveFolder(targetType);
-      const filePath = path.join(process.cwd(), 'uploads', folder, filename);
+      const filePath = path.join(ROOT_UPLOADS, folder, filename);
 
       if (fs.existsSync(filePath)) {
         return res.download(filePath);

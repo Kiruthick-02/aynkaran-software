@@ -1,5 +1,6 @@
 // frontend/src/modules/advisor/AdvisorMilestoneTimeline.jsx
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import {
   CheckCircle2, Clock, AlertOctagon, Lock, XCircle, ArrowRight,
   ShieldAlert, Check, FastForward, RotateCcw, Sparkles, UserCheck,
@@ -21,13 +22,13 @@ const resolveDocumentUrl = (value) => {
 const OFFICIAL_10_MILESTONES = [
   ['MEETING_APPOINTMENT', 'Meeting Appointment', 'Schedule the first meeting and dispatch alerts.', ['Set meeting date, time, and venue', 'Use candidate mobile and email from the record', 'Dispatch WhatsApp, SMS, and email alerts', 'Record Completed, Not Attended, Rescheduled, or Cancelled outcome']],
   ['ONBOARDING_COMMITMENT_SIGN', 'Onboarding Commitment Sign', 'Record the candidate commitment to continue.', ['Record Pending, Signed, or Declined status', 'Upload commitment/declaration document when available', 'Only Signed unlocks the next milestone']],
-  ['DOSSIER_KYC_COMPLETED', 'Dossier Scans and KYC Completed', 'Collect and verify mandatory KYC documents.', ['Upload Aadhaar, PAN, photo, bank proof, education certificate, and signature', 'Preview each selected document before confirming', 'Verify all mandatory documents', 'Show missing documents as blocked']],
-  ['PRL_APPLICATION_DONE', 'PRL Application Done', 'Record the PRL application.', ['Record PRL application status', 'Enter application date and reference number', 'Upload the PRL application document', 'Record completion remarks']],
-  ['PRL_VERIFICATION_FEE_CLEARED', 'PRL Verification Fee Cleared', 'Record PRL verification fee payment.', ['Enter fee type and amount', 'Record manual payment status', 'Enter payment date, method, and reference', 'Mark complete only when payment is Paid']],
-  ['IRDAI_PORTALS_TRAINING_ENROLLED', 'IRDAI Portals Training Enrolled', 'Record IRDAI portal training enrollment.', ['Record enrollment status and date', 'Enter training reference and batch', 'Set training start and end date', 'Record training provider or portal']],
+  ['DOSSIER_KYC_COMPLETED', 'Document Scans and KYC Completed', 'Collect and verify mandatory KYC documents.', ['Upload Aadhaar, PAN, photo, bank proof, education certificate, and signature', 'Preview each selected document before confirming', 'Verify all mandatory documents', 'Show missing documents as blocked']],
+  ['PRL_VERIFICATION_FEE_CLEARED', 'PRL Verification Fee Cleared', 'Record PRL verification fee payment.', ['Enter  amount', 'Record manual payment status', 'Enter payment date, method, and reference', 'Mark complete only when payment is Paid']],
+  ['PRL_APPLICATION_DONE', 'PRL Application Done', 'Record the PRL application.', ['Record PRL application status', 'Enter the manual URN number', 'Enter application date and reference number', 'Upload the PRL application document', 'Record completion remarks']],
+  ['IRDAI_PORTALS_TRAINING_ENROLLED', 'Training Enrolled', 'Record IRDAI portal training enrollment.', ['Record enrollment status and date', 'Enter training reference and batch', 'Set training start and end date', 'Record training provider or portal']],
   ['TRAINING_LICENSE_FEE_PAID', 'Training License Fee Paid', 'Record training license fee payment.', ['Enter amount and payment status', 'Record manual payment date and method', 'Enter receipt/reference number', 'Mark complete only when payment is Paid']],
-  ['NSEIT_EXAM_REGISTERED', 'NSEIT Exam Registered', 'Record NSEIT exam registration and fee payment.', ['Enter registration number and registration date', 'Set exam date and exam center', 'Record exam fee, payment status, date, method, and reference', 'Upload hall ticket or registration document']],
-  ['IRDAI_CARRIER_CERTIFICATION_PASSED', 'IRDAI Carrier Certification Passed', 'Record certification result.', ['Record result as Pending, Failed, or Passed', 'Enter result date, certification number, and score', 'Upload certification document', 'Only Passed unlocks final license generation']],
+  ['NSEIT_EXAM_REGISTERED', 'Exam Registered', 'Record exam registration and fee payment.', ['Enter registration number and registration date', 'Set exam date and exam center', 'Record exam fee, payment status, date, method, and reference', 'Upload hall ticket or registration document']],
+  ['IRDAI_CARRIER_CERTIFICATION_PASSED', 'Exam Passed', 'Record certification result.', ['Record result as Pending, Failed, or Passed', 'Enter result date, certification number, and score', 'Upload certification document', 'Only Passed unlocks final license generation']],
   ['ACTIVE_AYNKARAN_LICENSE_GENERATED', 'Active Aynkaran License Generated', 'Generate the active Aynkaran advisor license/code.', ['Enter Aynkaran license/advisor code', 'Record license generated date and company', 'Assign ABP and L1 Manager where applicable', 'Set advisor status to Active and upload license document']]
 ].map(([key, name, purpose, activities], index) => ({
   stage: index + 1, key, name, purpose, activities,
@@ -337,6 +338,7 @@ export default function AdvisorMilestoneTimeline({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionRemarks, setActionRemarks] = useState('');
   const [stageFormData, setStageFormData] = useState({});
+  const [pendingExamDecision, setPendingExamDecision] = useState(null);
   const [isDispatchingMeeting, setIsDispatchingMeeting] = useState(false);
   const [meetingDispatchResult, setMeetingDispatchResult] = useState(null);
 
@@ -441,6 +443,7 @@ export default function AdvisorMilestoneTimeline({
       // Initialize stage form data with candidate records and smart defaults
       const existingStageData = candidate.stageData?.[stg] || {};
       setStageFormData(prev => ({
+        traineeId: candidate.traineeId || existingStageData.traineeId || '',
         // Stage 3 defaults
         trainingBatch: candidate.trainingBatch || existingStageData.trainingBatch || `BATCH-${new Date().getFullYear()}-01`,
         trainingStartDate: candidate.trainingStartDate || existingStageData.trainingStartDate || new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
@@ -462,8 +465,9 @@ export default function AdvisorMilestoneTimeline({
         trainingCertificateNo: candidate.trainingCertificateNo || existingStageData.trainingCertificateNo || `CERT-TR-${Date.now().toString().slice(-5)}`,
 
         // Stage 6 defaults
-        examBody: candidate.examBody || existingStageData.examBody || 'NSEIT Limited (IRDAI Testing Partner)',
-        examRegNumber: candidate.examRegNumber || existingStageData.examRegNumber || `URN-${Date.now().toString().slice(-6)}`,
+        examBody: candidate.examBody || existingStageData.examBody || 'Limited (IRDAI Testing Partner)',
+        examRegNumber: candidate.examRegNumber || existingStageData.examRegNumber || '',
+        urnNumber: candidate.urnNumber || existingStageData.urnNumber || '',
         examFeeStatus: candidate.examFeeStatus || existingStageData.examFeeStatus || 'Paid',
         examFeeRef: candidate.examFeeRef || existingStageData.examFeeRef || `UPI/TXN/${Date.now().toString().slice(-6)}`,
         targetExamWindow: candidate.targetExamWindow || existingStageData.targetExamWindow || new Date(Date.now() + 86400000 * 10).toISOString().split('T')[0],
@@ -480,6 +484,9 @@ export default function AdvisorMilestoneTimeline({
         invigilatorRef: candidate.invigilatorRef || existingStageData.invigilatorRef || 'TERMINAL-LAB-04',
 
         // Stage 9 defaults
+        result: candidate.result || existingStageData.result || candidate.examResultStatus || '',
+        score: candidate.score || existingStageData.score || candidate.examScore || '',
+        resultDate: candidate.resultDate || existingStageData.resultDate || candidate.examResultDate || '',
         examScore: candidate.examScore || existingStageData.examScore || '38 / 50',
         examResultStatus: candidate.examResultStatus || existingStageData.examResultStatus || candidate.result || 'Pass',
         examResultDate: candidate.examResultDate || existingStageData.examResultDate || new Date().toISOString().split('T')[0],
@@ -560,6 +567,23 @@ export default function AdvisorMilestoneTimeline({
       return;
     }
 
+    if (currentStageNumber === 2 && !String(stageFormData.traineeId || '').trim()) {
+      onShowNotification?.('Enter the Trainee ID before completing Stage 2.');
+      return;
+    }
+
+    if (currentStageNumber === 9) {
+      const result = String(stageFormData.result || '').toLowerCase();
+      if (!['passed', 'failed', 'pass', 'fail'].includes(result)) {
+        onShowNotification?.('Select Passed or Failed before completing the certification result.');
+        return;
+      }
+      if (result === 'failed' || result === 'fail') {
+        setPendingExamDecision({ resultData: { ...stageFormData }, failedAt: new Date().toISOString() });
+        return;
+      }
+    }
+
     const stageToComplete = currentStageNumber;
     const nextStage = Math.min(stageToComplete + 1, 10);
 
@@ -591,6 +615,65 @@ export default function AdvisorMilestoneTimeline({
     } catch (err) {
       console.error('[Advance Milestone Error]', err);
       if (onShowNotification) onShowNotification(`Failed to advance stage: ${err.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const finalizeFailedExamDecision = async (decision) => {
+    if (!candidate || !pendingExamDecision) return;
+    setIsSubmitting(true);
+    const decisionDate = new Date().toISOString();
+    const existingHistory = Array.isArray(candidate.examDecisionHistory) ? candidate.examDecisionHistory : [];
+    const attempt = existingHistory.length + 1;
+    const decisionRecord = {
+      attempt,
+      result: 'Failed',
+      score: pendingExamDecision.resultData.score || '',
+      resultDate: pendingExamDecision.resultData.resultDate || decisionDate.split('T')[0],
+      decision,
+      decisionDate
+    };
+    const updatedCandidateFields = {
+      examDecision: decision,
+      examDecisionDate: decisionDate,
+      examDecisionHistory: [...existingHistory, decisionRecord],
+      examRetakeCount: decision === 'RETAKE' ? Number(candidate.examRetakeCount || 0) + 1 : Number(candidate.examRetakeCount || 0),
+      result: 'Fail',
+      examStatus: 'Failed',
+      stageData: {
+        ...(candidate.stageData || {}),
+        9: pendingExamDecision.resultData,
+        examDecision: decision,
+        examDecisionDate: decisionDate,
+        examDecisionHistory: [...existingHistory, decisionRecord]
+      }
+    };
+    const nextStage = decision === 'RETAKE' ? 8 : 10;
+    if (decision === 'TERMINATE') {
+      updatedCandidateFields.currentStage = 'Trainee Terminated - Exam Failed';
+      updatedCandidateFields.onboardingStatus = 'TERMINATED';
+      updatedCandidateFields.terminationReason = 'Failed certification exam';
+      updatedCandidateFields.terminatedAt = decisionDate;
+    }
+    try {
+      await advisorApi.updateAdvisorMilestone(candidate.id, 9, {
+        stageNumber: 9,
+        status: decision === 'RETAKE' ? 'FAILED_RETAKE' : 'FAILED_TERMINATED',
+        completedDate: decisionDate.split('T')[0],
+        remarks: `Certification failed. Decision: ${decision}.`,
+        stageData: updatedCandidateFields.stageData
+      });
+      await onProgressMilestone?.(9, nextStage, decision === 'RETAKE' ? 'NSEIT Exam Registered - Retake Required' : 'Trainee Terminated - Exam Failed', {
+        stageData: updatedCandidateFields.stageData,
+        ...updatedCandidateFields
+      });
+      setCurrentStageNumber(nextStage);
+      setPendingExamDecision(null);
+      setStageFormData({});
+      onShowNotification?.(decision === 'RETAKE' ? 'Exam failure recorded. Candidate moved back to Stage 8 for a retake.' : 'Exam failure recorded. Trainee was terminated.');
+    } catch (err) {
+      onShowNotification?.(`Unable to save exam decision: ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -1039,9 +1122,9 @@ export default function AdvisorMilestoneTimeline({
       </div>
 
       {/* 4. Single Stage Inspection Modal */}
-      {selectedStageForModal && (
+      {selectedStageForModal && typeof document !== 'undefined' && ReactDOM.createPortal((
         <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="relative w-full max-w-2xl max-h-[calc(100vh-7rem)] bg-[#0f172a] border border-slate-700 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+          <div className="relative w-full max-w-lg max-h-[calc(100vh-2rem)] bg-[#0f172a] border border-slate-700 rounded-3xl shadow-2xl overflow-hidden flex flex-col my-auto animate-scale-up">
             <div className="flex items-center justify-between px-6 py-4 bg-[#1e293b] border-b border-slate-800">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 text-blue-400 flex items-center justify-center font-mono font-bold">
@@ -1112,7 +1195,41 @@ export default function AdvisorMilestoneTimeline({
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
+
+      {pendingExamDecision && typeof document !== 'undefined' && ReactDOM.createPortal((
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="relative w-full max-w-md bg-[#0f172a] border border-rose-500/40 rounded-3xl shadow-2xl overflow-hidden animate-scale-up">
+            <div className="px-6 py-5 bg-[#1e293b] border-b border-slate-800">
+              <h3 className="text-base font-black text-white">Certification Exam Failed</h3>
+              <p className="mt-1 text-xs text-slate-400">Choose what should happen to this trainee. This decision will be saved in the recruitment report.</p>
+            </div>
+            <div className="p-6 space-y-3">
+              <button
+                type="button"
+                onClick={() => finalizeFailedExamDecision('RETAKE')}
+                disabled={isSubmitting}
+                className="w-full rounded-xl border border-blue-500/40 bg-blue-500/10 px-4 py-3 text-left text-xs font-bold text-blue-200 hover:bg-blue-500/20 disabled:opacity-50"
+              >
+                Retake Exam
+                <span className="mt-1 block text-[10px] font-normal text-slate-400">Record the failure and move the trainee back to Stage 8.</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => finalizeFailedExamDecision('TERMINATE')}
+                disabled={isSubmitting}
+                className="w-full rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-left text-xs font-bold text-rose-200 hover:bg-rose-500/20 disabled:opacity-50"
+              >
+                Terminate Trainee
+                <span className="mt-1 block text-[10px] font-normal text-slate-400">Close the recruitment process and keep the failure report.</span>
+              </button>
+            </div>
+            <div className="flex justify-end border-t border-slate-800 bg-[#1e293b] px-6 py-4">
+              <button type="button" onClick={() => setPendingExamDecision(null)} disabled={isSubmitting} className="rounded-xl bg-slate-800 px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-700 disabled:opacity-50">Cancel</button>
+            </div>
+          </div>
+        </div>
+      ), document.body)}
 
       {/* 5. Document Preview Modal (Uses ReactDOM.createPortal for guaranteed centered popup) */}
       <DocumentPreviewModal
@@ -1129,7 +1246,7 @@ export default function AdvisorMilestoneTimeline({
         isUploading={isUploadingDoc}
       />
 
-      {existingDocPreview && (
+      {existingDocPreview && typeof document !== 'undefined' && ReactDOM.createPortal((
         <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
           <div className="relative flex w-full max-w-3xl max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-3xl border border-slate-700 bg-[#0f172a] shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 bg-[#1e293b] px-4 py-3">
@@ -1146,7 +1263,7 @@ export default function AdvisorMilestoneTimeline({
             <div className="flex justify-end gap-3 border-t border-slate-800 bg-[#1e293b] px-4 py-3"><a href={resolveDocumentUrl(existingDocPreview.url || existingDocPreview.path)} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-slate-800 px-4 py-2 text-xs font-bold text-white">Open Document File</a><a href={resolveDocumentUrl(existingDocPreview.url || existingDocPreview.path)} download className="rounded-xl bg-[#0078d4] px-4 py-2 text-xs font-bold text-white">Download</a></div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }

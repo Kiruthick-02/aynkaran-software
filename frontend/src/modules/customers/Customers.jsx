@@ -608,7 +608,7 @@ export default function Customers({
     setEditIncomeProofFile(null);
   };
 
-  const saveRenewalDate = () => {
+  const saveRenewalDate = async () => {
     if (!selectedCustomer) return;
     if (!renewalDraft) {
       notify('Please select a renewal date');
@@ -616,14 +616,42 @@ export default function Customers({
     }
     const id = selectedCustomer.id || selectedCustomer._id;
     const patch = { renewalDate: renewalDraft };
-    if (typeof saveCustomerPatch === 'function') {
-      saveCustomerPatch(id, patch);
-    } else {
+    if (typeof saveCustomerPatch !== 'function') {
       notify('updateCustomer is not connected');
       return;
     }
-    setSelectedCustomer((prev) => (prev ? { ...prev, ...patch } : prev));
-    notify(`Renewal date set for ${selectedCustomer.name}`);
+
+    try {
+      await saveCustomerPatch(id, patch);
+
+      const customerMobile = selectedCustomer.mobileNumber || selectedCustomer.mobile || selectedCustomer.phone || '';
+      const customerEmail = selectedCustomer.emailId || selectedCustomer.email || '';
+      const customerName = selectedCustomer.name || selectedCustomer.fullName || 'Customer';
+      const policyName = selectedCustomer.policyType || selectedCustomer.policyName || 'insurance policy';
+
+      await apiService.createReminder({
+        title: `Policy Renewal Reminder: ${customerName}`,
+        description: `Dear ${customerName}, your ${policyName} renewal date is ${renewalDraft}. Please renew your policy before the due date to keep your coverage active.`,
+        dueDate: renewalDraft,
+        targetId: id,
+        targetType: 'customer',
+        triggerType: 'Customer Renewal Date Assigned',
+        completed: false,
+        channels: {
+          desktop: true,
+          sms: Boolean(customerMobile),
+          whatsapp: Boolean(customerMobile),
+          email: Boolean(customerEmail),
+        },
+        customerMobile,
+        customerEmail,
+      });
+
+      setSelectedCustomer((prev) => (prev ? { ...prev, ...patch } : prev));
+      notify(`Renewal date set and reminders sent for ${customerName}`);
+    } catch (error) {
+      notify(`Renewal date saved, but reminder dispatch failed: ${error.message}`);
+    }
   };
 
   const saveCustomerEdits = async () => {
@@ -1250,11 +1278,11 @@ export default function Customers({
                       </p>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {getDocuments(selectedCustomer).map((doc) => {
+                        {getDocuments(selectedCustomer).map((doc, index) => {
                           const href = fileUrl(doc.path);
                           return (
                             <div
-                              key={doc.label}
+                              key={`${doc.label}-${doc.path || doc.name || 'document'}-${index}`}
                               className="flex items-center justify-between gap-2 rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2"
                             >
                               <div className="min-w-0">
