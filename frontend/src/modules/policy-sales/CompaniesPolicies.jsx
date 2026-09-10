@@ -3,7 +3,7 @@ import React, { useState , useEffect } from 'react';
 import { Plus, X, Building2, ShieldCheck, User, MapPin, Sparkles, Check, HelpCircle, Calendar, Upload, Edit, Trash2 } from 'lucide-react';
 import { companyApi } from '../../services/companyApi'; 
 import { apiService } from '../../services/api';
-import API_URL from '../../config/api';
+import API_URL, { resolveApiUrl } from '../../config/api';
 
 import { createPortal } from 'react-dom';
 
@@ -1738,7 +1738,7 @@ const handleDeletePolicy = async (policyId, policyName) => {
     style={
       company.backgroundImage
         ? {
-            backgroundImage: `linear-gradient(rgba(30,41,59,0.55), rgba(30,41,59,0.50)), url(${API_URL}${company.backgroundImage})`,
+            backgroundImage: `linear-gradient(rgba(30,41,59,0.55), rgba(30,41,59,0.50)), url(${resolveApiUrl(company.backgroundImage)})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
           }
@@ -1767,7 +1767,7 @@ const handleDeletePolicy = async (policyId, policyName) => {
             <div className="w-9 h-9 rounded-lg bg-slate-800/90 border border-slate-600 flex items-center justify-center overflow-hidden shadow">
               {company.logo ? (
                 <img
-                  src={`${API_URL}${company.logo}`}
+                  src={resolveApiUrl(company.logo)}
                   alt={company.name}
                   className="w-full h-full object-contain"
                 />
@@ -1891,7 +1891,7 @@ const handleDeletePolicy = async (policyId, policyName) => {
             <div className="w-14 h-14 rounded-full bg-slate-900 border border-slate-600 overflow-hidden flex items-center justify-center font-bold text-white shrink-0">
               {selectedCompany.logo ? (
                 <img
-                  src={`${API_URL}${selectedCompany.logo}`}
+                  src={resolveApiUrl(selectedCompany.logo)}
                   alt=""
                   className="w-full h-full object-cover"
                 />
@@ -3224,7 +3224,7 @@ const handleDeletePolicy = async (policyId, policyName) => {
                 <img
                   src={
                     editCompanyLogoPreview ||
-                    `${API_URL}${editCompanyLogo}`
+                    resolveApiUrl(editCompanyLogo)
                   }
                   alt="Logo"
                   className="w-12 h-12 rounded-lg object-cover border border-slate-600"
