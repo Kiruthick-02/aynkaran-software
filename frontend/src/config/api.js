@@ -1,8 +1,8 @@
 //src/config/api.js
 // Central API configuration for production and development
 const configuredApiUrl = String(import.meta.env.VITE_API_URL || '').trim();
-const deployedSpaceUrl = 'https://kiruthick-02-aynakaran-crm.hf.space';
-let baseUrl = configuredApiUrl || (import.meta.env.PROD ? deployedSpaceUrl : 'http://localhost:7860');
+const deployedBackendUrl = 'https://aynkaran-backend.onrender.com';
+let baseUrl = configuredApiUrl || (import.meta.env.PROD ? deployedBackendUrl : 'http://localhost:7860');
 
 // Fallback to relative paths on active container instances (Google development/preview containers, localhost)
 if (!configuredApiUrl && typeof window !== 'undefined') {

@@ -33,6 +33,10 @@ export function createExpressApp(db) {
     'http://localhost:3000',   // Website frontend
     'http://127.0.0.1:3000',
   ];
+  const configuredFrontendOrigins = String(process.env.FRONTEND_URL || '')
+    .split(',')
+    .map(origin => origin.trim().replace(/\/$/, ''))
+    .filter(Boolean);
 
   app.use(cors({
     origin: function (origin, callback) {
@@ -41,7 +45,9 @@ export function createExpressApp(db) {
         allowedOrigins.includes(origin) ||
         origin.includes('up.railway.app') ||
         origin.includes('.hf.space') ||
-        origin.includes('huggingface.co')
+        origin.includes('huggingface.co') ||
+        origin.includes('.vercel.app') ||
+        configuredFrontendOrigins.includes(origin)
       ) {
         return callback(null, true);
       }
