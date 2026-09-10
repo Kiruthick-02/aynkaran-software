@@ -736,15 +736,15 @@ export default function Documents({
             </div>
 
             <div className="flex-1 bg-slate-950 p-4 min-h-[250px] max-h-[50vh] overflow-auto flex items-center justify-center">
-              {isPdf(previewDoc.url, previewDoc.name) ? (
+              {isPdf(resolveApiUrl(previewDoc.url), previewDoc.name) ? (
                 <iframe
-                  src={previewDoc.url}
+                  src={resolveApiUrl(previewDoc.url)}
                   title={previewDoc.name}
                   className="w-full h-[45vh] rounded-xl border border-slate-800 bg-white"
                 />
-              ) : isImage(previewDoc.url, previewDoc.name) ? (
+              ) : isImage(resolveApiUrl(previewDoc.url), previewDoc.name) ? (
                 <img
-                  src={previewDoc.url}
+                  src={resolveApiUrl(previewDoc.url)}
                   alt={previewDoc.name}
                   className="max-h-[45vh] max-w-full object-contain rounded-xl shadow-lg border border-slate-800"
                 />
@@ -753,7 +753,7 @@ export default function Documents({
                   <FileText className="w-12 h-12 text-slate-500 mx-auto" />
                   <p className="text-sm font-bold text-white">{previewDoc.name}</p>
                   <a
-                    href={previewDoc.url}
+                    href={resolveApiUrl(previewDoc.url)}
                     target="_blank"
                     rel="noreferrer"
                     className="text-blue-400 underline text-xs"
@@ -771,7 +771,7 @@ export default function Documents({
               <div className="flex items-center gap-2">
                 {previewDoc.url && (
                   <a
-                    href={previewDoc.url}
+                    href={resolveApiUrl(previewDoc.url)}
                     target="_blank"
                     rel="noreferrer"
                     download

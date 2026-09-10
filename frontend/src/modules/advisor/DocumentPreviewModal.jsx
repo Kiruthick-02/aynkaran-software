@@ -117,13 +117,20 @@ export default function DocumentPreviewModal({
           <div className="w-full h-56 bg-slate-900/90 rounded-2xl border border-slate-800 p-2 flex items-center justify-center overflow-hidden relative shadow-inner">
             {previewUrl ? (
               isPdf ? (
-                <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4 text-center">
-                  <FileText className="h-10 w-10 text-blue-400" />
-                  <p className="text-xs font-bold text-white">PDF selected and ready to upload</p>
-                  <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] font-bold text-blue-400 underline">
-                    Open PDF in a new tab
-                  </a>
-                </div>
+                <object
+                  data={previewUrl}
+                  type="application/pdf"
+                  aria-label={file.name}
+                  className="h-full w-full rounded-xl border border-slate-800 bg-white"
+                >
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-slate-900 p-4 text-center">
+                    <FileText className="h-10 w-10 text-blue-400" />
+                    <p className="text-xs font-bold text-white">PDF selected and ready to upload</p>
+                    <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] font-bold text-blue-400 underline">
+                      Open PDF in a new tab
+                    </a>
+                  </div>
+                </object>
               ) : isImage ? (
                 <img
                   src={previewUrl}
