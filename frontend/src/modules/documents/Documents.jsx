@@ -247,6 +247,7 @@ export default function Documents({
         name: d.name || d.fileName || 'Uploaded Document',
         fileName: d.fileName || d.name,
         category: d.category || 'KYC Document',
+        mimetype: d.mimetype || d.mimeType || '',
         path: d.path || d.url,
         url: resolveUrl(d.url || d.path),
         sourceType: sType,
@@ -378,15 +379,16 @@ export default function Documents({
 
   const handlePreviewDoc = (doc) => setPreviewDoc(doc);
 
-  const isImage = (url, name) => {
+  const isImage = (url, name, mimetype = '') => {
     if (!url && !name) return false;
-    const s = (url || name || '').toLowerCase();
-    return /\.(jpe?g|png|gif|webp|avif|bmp)$/i.test(s) || s.startsWith('blob:') || s.startsWith('data:image');
+    const values = [url, name].filter(Boolean).map(value => String(value).toLowerCase());
+    return String(mimetype).toLowerCase().startsWith('image/') ||
+      values.some(value => /\.(jpe?g|png|gif|webp|avif|bmp)(?:\?|#|$)/i.test(value) || value.startsWith('blob:') || value.startsWith('data:image'));
   };
 
-  const isPdf = (url, name) => {
-    const s = (url || name || '').toLowerCase();
-    return s.endsWith('.pdf') || s.includes('application/pdf');
+  const isPdf = (url, name, mimetype = '') => {
+    const values = [url, name].filter(Boolean).map(value => String(value).toLowerCase());
+    return String(mimetype).toLowerCase() === 'application/pdf' || values.some(value => /\.pdf(?:\?|#|$)/i.test(value));
   };
 
   return (
@@ -736,13 +738,13 @@ export default function Documents({
             </div>
 
             <div className="flex-1 bg-slate-950 p-4 min-h-[250px] max-h-[50vh] overflow-auto flex items-center justify-center">
-              {isPdf(resolveApiUrl(previewDoc.url), previewDoc.name) ? (
+              {isPdf(resolveApiUrl(previewDoc.url), previewDoc.name, previewDoc.mimetype) ? (
                 <iframe
                   src={resolveApiUrl(previewDoc.url)}
                   title={previewDoc.name}
                   className="w-full h-[45vh] rounded-xl border border-slate-800 bg-white"
                 />
-              ) : isImage(resolveApiUrl(previewDoc.url), previewDoc.name) ? (
+              ) : isImage(resolveApiUrl(previewDoc.url), previewDoc.name, previewDoc.mimetype) ? (
                 <img
                   src={resolveApiUrl(previewDoc.url)}
                   alt={previewDoc.name}
