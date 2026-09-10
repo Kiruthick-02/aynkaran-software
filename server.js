@@ -32,10 +32,10 @@ async function connectMongo() {
       mongoDbConnection = client.db(dbName);
       console.log(`[System] Connected successfully to MongoDB: "${dbName}"`);
     } catch (err) {
-      console.error('[System] MongoDB connection error, utilizing local database.json:', err);
+      console.error('[System] MongoDB connection error. Falling back to ephemeral database.json:', err.message);
     }
   } else {
-    console.log('[System] No MONGODB_URI provided. Fallback database.json is active.');
+    console.warn('[System] No MONGODB_URI provided. Fallback database.json is active and will not persist reliably on Hugging Face Spaces.');
   }
 }
 
@@ -1154,6 +1154,15 @@ Aynkaran Business CRM Autopilot`;
       }
       res.json({ success: true, timestamp: new Date().toISOString() });
     }
+  });
+
+  app.get('/api/storage-status', (req, res) => {
+    res.json({
+      success: true,
+      storage: mongoDbConnection ? 'mongodb' : 'database.json',
+      persistent: Boolean(mongoDbConnection),
+      environment: process.env.NODE_ENV || 'development'
+    });
   });
 
   // Vite development integration
