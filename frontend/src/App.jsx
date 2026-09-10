@@ -119,15 +119,6 @@ function MainLayout() {
     } catch (_) {}
   }, [advisorCandidates, trainingPrograms, licensingExams, advisors]);
 
-  // Recruitment & Milestones has its own lifecycle state. Mirror it to the
-  // shared candidate API so Documents Vault can resolve the same trainee.
-  useEffect(() => {
-    if (!advisorCandidates.length) return;
-    Promise.all(advisorCandidates.map(candidate =>
-      apiService.updateCandidate(candidate.id, candidate)
-    )).catch(error => console.warn('[Advisor Candidate Sync]', error.message));
-  }, [advisorCandidates]);
-
   const handleAddAdvisorCandidate = async (candidate) => {
     const row = {
       ...candidate,
@@ -528,13 +519,13 @@ function MainLayout() {
 
             {activeTab === 'recruitment' && (
               <AdvisorManagementModule
-                candidates={advisorCandidates}
+                candidates={candidates}
                 programs={trainingPrograms}
                 exams={licensingExams}
                 advisors={advisors}
-                onAddCandidate={handleAddAdvisorCandidate}
-                onUpdateCandidate={handleUpdateAdvisorCandidate}
-                onDeleteCandidate={handleDeleteAdvisorCandidate}
+                onAddCandidate={addCandidate}
+                onUpdateCandidate={updateCandidate}
+                onDeleteCandidate={deleteCandidate}
                 onAddProgram={handleAddTrainingProgram}
                 onUpdateProgram={handleUpdateTrainingProgram}
                 onAddExam={handleAddLicensingExam}

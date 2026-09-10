@@ -89,12 +89,20 @@ export function AppProvider({ children }) {
         (localStorage.getItem('aynakaran_user') === 'admin' ? 'SuperAdmin' : 'Staff');
       const username = localStorage.getItem('aynakaran_user') || 'admin';
 
-      const [custs, cands, pols, rems] = await Promise.all([
+      const responses = await Promise.allSettled([
         apiService.getCustomers(role, username),
         apiService.getCandidates(),
         apiService.getPolicies(role, username),
         apiService.getReminders(role, username),
       ]);
+
+      const [custResult, candResult, policyResult, reminderResult] = responses;
+      const failedResources = responses
+        .map((response, index) => response.status === 'rejected' ? ['customers', 'candidates', 'policies', 'reminders'][index] : null)
+        .filter(Boolean);
+      if (failedResources.length) {
+        console.warn(`[Sync Error] Failed resources: ${failedResources.join(', ')}`);
+      }
 
       const cachedCusts = JSON.parse(
         localStorage.getItem(`ayn_customers_${username}`) || '[]'
@@ -109,16 +117,12 @@ export function AppProvider({ children }) {
         localStorage.getItem(`ayn_reminders_${username}`) || '[]'
       );
 
-      let resolvedCusts = Array.isArray(custs) ? custs : [];
-      let resolvedCands = Array.isArray(cands) ? cands : [];
-      let resolvedPols = Array.isArray(pols) ? pols : [];
-      let resolvedRems = Array.isArray(rems) ? rems : [];
+      let resolvedCusts = custResult.status === 'fulfilled' && Array.isArray(custResult.value) ? custResult.value : cachedCusts;
+      let resolvedCands = candResult.status === 'fulfilled' && Array.isArray(candResult.value) ? candResult.value : cachedCands;
+      let resolvedPols = policyResult.status === 'fulfilled' && Array.isArray(policyResult.value) ? policyResult.value : cachedPols;
+      let resolvedRems = reminderResult.status === 'fulfilled' && Array.isArray(reminderResult.value) ? reminderResult.value : cachedRems;
 
-      if (
-        (resolvedCusts.length === 0 && cachedCusts.length > 0) ||
-        (resolvedPols.length === 0 && cachedPols.length > 0) ||
-        (resolvedCands.length === 0 && cachedCands.length > 0)
-      ) {
+      if (failedResources.length > 0) {
         const payload = {
           customers: resolvedCusts.length > 0 ? resolvedCusts : cachedCusts,
           candidates: resolvedCands.length > 0 ? resolvedCands : cachedCands,
