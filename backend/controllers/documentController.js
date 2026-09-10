@@ -118,7 +118,7 @@ export class DocumentController {
         [String(advisor._id || ''), advisor],
         [String(advisor.advisorCode || ''), advisor]
       ]).filter(([id]) => id));
-      const storedDocuments = await this.db.collection('documents').find().sort({ uploadedAt: -1 }).toArray();
+      const storedDocuments = await this.db.collection('documents', { projection: { fileData: 0 } }).find({}, { projection: { fileData: 0 } }).sort({ uploadedAt: -1 }).toArray();
       // Some older recruitment saves store the document only in the trainee
       // record. Expose those mirrored records too, so the Vault and the
       // Recruitment screen never disagree about a successfully uploaded file.
@@ -185,13 +185,17 @@ export class DocumentController {
       const targetId = req.body.targetId || '';
       const targetType = req.body.targetType || 'misc';
       const folder = resolveFolder(targetType);
+      const binaryData = fs.readFileSync(req.file.path);
 
       // Public path served by express.static('/uploads')
-      const publicPath = `/uploads/${folder}/${req.file.filename}`;
       const originalName = req.file.originalname || req.file.filename;
+      const documentId = `doc-${Date.now().toString().slice(-6)}`;
+      const publicPath = this.db?.collection
+        ? `/api/documents/file/${documentId}`
+        : `/uploads/${folder}/${req.file.filename}`;
 
       const newDoc = {
-        id: `doc-${Date.now().toString().slice(-6)}`,
+        id: documentId,
         name: originalName,
         fileName: originalName,
         category,
@@ -200,6 +204,7 @@ export class DocumentController {
         filename: req.file.filename,
         mimetype: req.file.mimetype,
         size: req.file.size,
+        fileData: this.db?.collection ? binaryData : undefined,
         targetId,
         targetType,
         verificationStatus: 'PENDING',
@@ -404,6 +409,9 @@ export class DocumentController {
         }
       }
 
+      const responseDocument = { ...newDoc };
+      delete responseDocument.fileData;
+
       // Response shape expected by caller
       res.status(201).json({
         success: true,
@@ -412,10 +420,34 @@ export class DocumentController {
         filePath: publicPath,
         fileName: originalName,
         name: originalName,
-        document: newDoc,
+        document: responseDocument,
       });
     } catch (e) {
       console.error('[DocumentController.upload]', e);
+      res.status(500).json({ error: e.message });
+    }
+  };
+
+  file = async (req, res) => {
+    try {
+      const document = await this.db.collection('documents').findOne({ id: req.params.id });
+      if (!document) return res.status(404).json({ error: 'Document not found.' });
+
+      if (document.fileData) {
+        const buffer = Buffer.isBuffer(document.fileData)
+          ? document.fileData
+          : document.fileData.buffer;
+        res.setHeader('Content-Type', document.mimetype || 'application/octet-stream');
+        res.setHeader('Content-Length', buffer.length);
+        res.setHeader('Content-Disposition', `inline; filename="${String(document.fileName || document.name || 'document').replace(/"/g, '')}"`);
+        return res.send(buffer);
+      }
+
+      const folder = resolveFolder(document.targetType);
+      const legacyPath = path.join(ROOT_UPLOADS, folder, document.filename || path.basename(document.path || document.url || ''));
+      if (fs.existsSync(legacyPath)) return res.sendFile(legacyPath);
+      return res.status(404).json({ error: 'Document binary is unavailable.' });
+    } catch (e) {
       res.status(500).json({ error: e.message });
     }
   };

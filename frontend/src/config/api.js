@@ -1,15 +1,15 @@
 //src/config/api.js
 // Central API configuration for production and development
-let baseUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:7860');
+const configuredApiUrl = String(import.meta.env.VITE_API_URL || '').trim();
+let baseUrl = configuredApiUrl || (import.meta.env.PROD ? '' : 'http://localhost:7860');
 
 // Fallback to relative paths on active container instances (Google development/preview containers, localhost)
-if (typeof window !== 'undefined') {
+if (!configuredApiUrl && typeof window !== 'undefined') {
   const host = window.location.hostname;
   if (
     !host ||
     host.includes('run.app') ||
     host.includes('hf.space') ||
-    host.includes('huggingface.co') ||
     host.includes('localhost') ||
     host.includes('127.0.0.1')
   ) {

@@ -9,6 +9,7 @@ export function documentRoutes(db) {
 
   // multipart field name must be "file" (matches frontend FormData)
   router.get('/', controller.getAll);
+  router.get('/file/:id', controller.file);
   router.post('/upload', uploadMiddleware.single('file'), controller.upload);
   router.delete('/:id', controller.delete);
   router.patch('/:id/verify', controller.verify);
