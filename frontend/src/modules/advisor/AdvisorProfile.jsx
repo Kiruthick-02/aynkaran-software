@@ -90,7 +90,7 @@ export default function AdvisorProfile({
       });
     } catch (err) {
       console.error('[Advisor Profile Error]', err);
-      setError(err.message || 'Failed to load advisor dossier profile.');
+      setError(err.message || 'Failed to load advisor customer profile.');
     } finally {
       setIsLoading(false);
     }

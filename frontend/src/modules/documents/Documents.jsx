@@ -158,6 +158,8 @@ export default function Documents({
   customers = [],
   candidates = [],
   advisors = [],
+  userRole = 'SuperAdmin',
+  adminUser = 'admin',
   onUpdateCustomer,
   onUpdateCandidate,
   updateCustomer,
@@ -177,10 +179,10 @@ export default function Documents({
     : Array.isArray(customers)
     ? customers
     : [];
-  const advisorList = Array.isArray(advisors) ? advisors : [];
+  const advisorList = userRole === 'Staff' ? [] : (Array.isArray(advisors) ? advisors : []);
   // A converted candidate without a matching advisor is an orphan left by a
   // previous advisor deletion. Its mirrored files must not remain in the vault.
-  const candidateList = (Array.isArray(candidates) ? candidates : []).filter((candidate) => {
+  const candidateList = userRole === 'Staff' ? [] : (Array.isArray(candidates) ? candidates : []).filter((candidate) => {
     if (!candidate.isConvertedToAdvisor) return true;
     return advisorList.some((advisor) => advisor.candidateId === candidate.id);
   });
@@ -197,7 +199,8 @@ export default function Documents({
   const fetchDbDocs = useCallback(async () => {
     setIsLoadingDb(true);
     try {
-      const res = await fetch(`${API_URL}/api/documents`);
+      const q = userRole && adminUser ? `?role=${encodeURIComponent(userRole)}&username=${encodeURIComponent(adminUser)}` : '';
+      const res = await fetch(`${API_URL}/api/documents${q}`);
       const data = await res.json();
       if (data.success && Array.isArray(data.documents)) {
         setDbDocuments(data.documents);
@@ -207,7 +210,7 @@ export default function Documents({
     } finally {
       setIsLoadingDb(false);
     }
-  }, []);
+  }, [userRole, adminUser]);
 
   useEffect(() => {
     fetchDbDocs();
@@ -469,48 +472,51 @@ export default function Documents({
           </div>
         </div>
 
-        <hr className="border-slate-800" />
-
-        {/* 2. Agent Trainee Folders */}
-        <div className="space-y-2">
-          <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-            <FolderClosed className="w-3.5 h-3.5 text-emerald-400" /> Agent Training Folders ({candidateFolders.length})
-          </h4>
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            <button
-              type="button"
-              onClick={() => setActiveFolderFilter({ type: 'Candidate' })}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition-all cursor-pointer ${
-                activeFolderFilter.type === 'Candidate' && !activeFolderFilter.id
-                  ? 'bg-emerald-600 text-white shadow'
-                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-              }`}
-            >
-              All Trainees ({candidateFolders.length})
-            </button>
-            {candidateFolders.map((cand) => {
-              const id = cand.id;
-              const isSelected = activeFolderFilter.type === 'Candidate' && activeFolderFilter.id === id;
-              return (
+        {userRole !== 'Staff' && candidateFolders.length > 0 && (
+          <>
+            <hr className="border-slate-800" />
+            {/* 2. Agent Trainee Folders */}
+            <div className="space-y-2">
+              <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                <FolderClosed className="w-3.5 h-3.5 text-emerald-400" /> Agent Training Folders ({candidateFolders.length})
+              </h4>
+              <div className="flex gap-2 overflow-x-auto pb-2">
                 <button
-                  key={id}
                   type="button"
-                  onClick={() => setActiveFolderFilter({ type: 'Candidate', id })}
+                  onClick={() => setActiveFolderFilter({ type: 'Candidate' })}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-emerald-600/30 text-emerald-300 border border-emerald-500/50 shadow'
+                    activeFolderFilter.type === 'Candidate' && !activeFolderFilter.id
+                      ? 'bg-emerald-600 text-white shadow'
                       : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                   }`}
                 >
-                  📁 {cand.name || id}
+                  All Trainees ({candidateFolders.length})
                 </button>
-              );
-            })}
-          </div>
-        </div>
+                {candidateFolders.map((cand) => {
+                  const id = cand.id;
+                  const isSelected = activeFolderFilter.type === 'Candidate' && activeFolderFilter.id === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setActiveFolderFilter({ type: 'Candidate', id })}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-emerald-600/30 text-emerald-300 border border-emerald-500/50 shadow'
+                          : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                      }`}
+                    >
+                      📁 {cand.name || id}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
 
         {/* 3. Advisor KYC Folders */}
-        {advisorList.length > 0 && (
+        {userRole !== 'Staff' && advisorList.length > 0 && (
           <>
             <hr className="border-slate-800" />
             <div className="space-y-2">
@@ -559,7 +565,7 @@ export default function Documents({
           <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
           <input
             type="text"
-            placeholder="Search documents by file name, category, customer, trainee, or advisor..."
+            placeholder="Search documents by file name, category, or customer..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-9 pr-4 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
@@ -572,8 +578,8 @@ export default function Documents({
         >
           <option value="all">-- All Document Categories --</option>
           <option value="Customer">Customer KYC Documents Only</option>
-          <option value="Candidate">Candidate Training Documents Only</option>
-          <option value="Advisor">Advisor Licensing Documents Only</option>
+          {userRole !== 'Staff' && <option value="Candidate">Candidate Training Documents Only</option>}
+          {userRole !== 'Staff' && <option value="Advisor">Advisor Licensing Documents Only</option>}
           <option value="Passport">Passport-Size Photos</option>
           <option value="Aadhaar">Aadhaar Card copies</option>
           <option value="PAN">PAN Card copies</option>

@@ -152,11 +152,19 @@ export const apiService = {
   }),
 
   // --- MULTIPART SECURE BINARY DOCUMENT UPLOADER ---
-  uploadDocument: async (file, category, targetId, targetType) => {
+  getDocuments: (role, username, supervise) => {
+    let q = (role && username) ? `?role=${encodeURIComponent(role)}&username=${encodeURIComponent(username)}` : '';
+    if (supervise) {
+      q += q ? '&supervise=true' : '?supervise=true';
+    }
+    return request(`/documents${q}`);
+  },
+  uploadDocument: async (file, category, targetId, targetType, createdBy) => {
     const formData = new FormData();
     formData.append('category', category);
     formData.append('targetId', targetId);
     formData.append('targetType', targetType);
+    if (createdBy) formData.append('createdBy', createdBy);
     formData.append('file', file);
 
     const response = await fetch(`${API_BASE}/documents/upload`, {

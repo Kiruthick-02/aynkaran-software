@@ -10,6 +10,7 @@ export class ReminderController {
 
   getAll = async (req, res) => {
     try {
+      const { role, username, supervise } = req.query;
       const todayStr = new Date().toISOString().split('T')[0];
       // Automatically complete all outstanding reminders where the renewal date / due date is in the past (over)
       await this.db.collection('reminders').updateMany(
@@ -26,7 +27,22 @@ export class ReminderController {
         }
       );
 
-      const rows = await this.db.collection('reminders').find().sort({ dueDate: 1 }).toArray();
+      let query = {};
+      if (role === 'Staff' && username) {
+        query = { createdBy: username };
+      } else if (supervise === 'true' || req.query.all === 'true') {
+        query = {};
+      } else {
+        query = {
+          $or: [
+            { createdBy: 'admin' },
+            { createdBy: { $exists: false } },
+            { createdBy: null }
+          ]
+        };
+      }
+
+      const rows = await this.db.collection('reminders').find(query).sort({ dueDate: 1 }).toArray();
       const formatted = rows.map(r => ({
         ...r,
         id: r.id || r._id.toString(),
@@ -46,6 +62,7 @@ export class ReminderController {
       data.id = data.id || `rem-${Date.now().toString().slice(-5)}`;
       data.completed = Boolean(data.completed);
       data.createdAt = data.createdAt || new Date().toISOString();
+      data.createdBy = data.createdBy || req.query.username || 'admin';
 
       data.channels = data.channels || {};
       data.deliveryStatus = data.deliveryStatus || {};

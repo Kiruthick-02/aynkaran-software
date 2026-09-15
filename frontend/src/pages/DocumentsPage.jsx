@@ -10,22 +10,28 @@ export default function DocumentsPage({ onShowNotification }) {
     candidates,
     updateCustomer,
     updateCandidate,
+    userRole,
+    adminUser,
   } = useApp();
 
   const [advisors, setAdvisors] = useState([]);
 
   useEffect(() => {
-    advisorApi.getAdvisors().then(data => {
-      if (Array.isArray(data)) setAdvisors(data);
-    }).catch(err => console.warn('[Doc Page Fetch Advisors]', err.message));
-  }, []);
+    if (userRole !== 'Staff') {
+      advisorApi.getAdvisors().then(data => {
+        if (Array.isArray(data)) setAdvisors(data);
+      }).catch(err => console.warn('[Doc Page Fetch Advisors]', err.message));
+    }
+  }, [userRole]);
 
   return (
     <Documents
       policyHolders={customers}
       customers={customers}
-      candidates={candidates}
-      advisors={advisors}
+      candidates={userRole === 'Staff' ? [] : candidates}
+      advisors={userRole === 'Staff' ? [] : advisors}
+      userRole={userRole}
+      adminUser={adminUser}
       onUpdateCustomer={updateCustomer}
       onUpdateCandidate={updateCandidate}
     />

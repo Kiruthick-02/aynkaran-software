@@ -110,6 +110,13 @@ function MainLayout() {
     }
   });
 
+  // Route protection: If user is Staff and attempts to access restricted tabs, fallback to dashboard
+  useEffect(() => {
+    if (userRole === 'Staff' && (activeTab === 'recruitment' || activeTab === 'content' || activeTab === 'staff_management')) {
+      setActiveTab('dashboard');
+    }
+  }, [userRole, activeTab, setActiveTab]);
+
   useEffect(() => {
     try {
       localStorage.setItem('aynkaran_advisor_candidates', JSON.stringify(advisorCandidates));
@@ -412,6 +419,7 @@ function MainLayout() {
         setActiveTab={setActiveTab}
         onLogout={logout}
         adminUsername={adminUser}
+        userRole={userRole}
       />
 
       <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -508,16 +516,13 @@ function MainLayout() {
           <div className="max-w-screen-2xl mx-auto">
             {activeTab === 'dashboard' && <DashboardPage />}
 
-            {/* Companies & Policies — MUST receive onAddCustomer */}
+            {/* Companies & Policies */}
             {activeTab === 'policies' && (
-              <PolicySalesPage
-                policyHolders={policyHolders}
-                onAddCustomer={handleAddCustomer}
-                onShowNotification={showNotification}
-              />
+              <PolicySalesPage />
             )}
 
-            {activeTab === 'recruitment' && (
+            {/* Agent Recruitment (SuperAdmin only) */}
+            {activeTab === 'recruitment' && userRole !== 'Staff' && (
               <AdvisorManagementModule
                 candidates={candidates}
                 programs={trainingPrograms}
@@ -535,25 +540,22 @@ function MainLayout() {
               />
             )}
 
-            {/* Customers — same list */}
+            {/* Customers */}
             {activeTab === 'customers' && (
               <CustomersPage
-                customers={policyHolders}
-                onUpdateCustomer={handleUpdateCustomer}
-                onShowNotification={showNotification}
                 initialEnquiry={selectedNotification?.enquiryType === 'advisor' ? null : selectedNotification}
               />
             )}
 
             {activeTab === 'reminders' && <RemindersPage />}
             {activeTab === 'documents' && <DocumentsPage />}
-            {activeTab === 'staff_management' && <StaffManagement />}
+            {activeTab === 'staff_management' && userRole === 'SuperAdmin' && <StaffManagement />}
             {activeTab === 'reports' && <ReportsPage />}
 
-            {/* Content Publishing */}
-{activeTab === 'content' && (
-  <ContentPublishingPage onShowNotification={showNotification} />
-)}
+            {/* Content Publishing (SuperAdmin only) */}
+            {activeTab === 'content' && userRole !== 'Staff' && (
+              <ContentPublishingPage onShowNotification={showNotification} />
+            )}
 
           </div>
         </main>

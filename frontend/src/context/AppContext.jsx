@@ -474,6 +474,7 @@ export function AppProvider({ children }) {
       ...rem,
       id: remId,
       createdAt: rem.createdAt || new Date().toISOString(),
+      createdBy: adminUser,
     };
     setReminders((prev) => [newRem, ...prev]);
     try {

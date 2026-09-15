@@ -38,6 +38,7 @@ export class CustomerController {
       const data = { ...req.body };
       data.id = data.id || `cust-${Date.now().toString().slice(-5)}`;
       data.createdAt = data.createdAt || new Date().toISOString();
+      data.createdBy = data.createdBy || req.query.username || 'admin';
 
       // Clean base64 strings if necessary or save objects natively
       data.kycDocuments = data.kycDocuments || {};

@@ -70,6 +70,7 @@ export class DocumentController {
   // before the cascade-delete behaviour was introduced.
   getAll = async (req, res) => {
     try {
+      const { role, username, supervise } = req.query;
       const advisors = await this.db.collection('advisors').find({}, { projection: { id: 1, advisorCode: 1, candidateId: 1 } }).toArray();
       const advisorDocumentIds = new Set(
         advisors.flatMap(advisor => [advisor.id, advisor._id, advisor.advisorCode])
@@ -109,6 +110,8 @@ export class DocumentController {
       }
 
       const candidates = await this.db.collection('candidates').find({}, { projection: { id: 1, name: 1, fullName: 1 } }).toArray();
+      const customers = await this.db.collection('customers').find({}, { projection: { id: 1, name: 1, createdBy: 1 } }).toArray();
+
       const candidateById = new Map(candidates.flatMap(candidate => [
         [String(candidate.id || ''), candidate],
         [String(candidate._id || ''), candidate]
@@ -118,6 +121,11 @@ export class DocumentController {
         [String(advisor._id || ''), advisor],
         [String(advisor.advisorCode || ''), advisor]
       ]).filter(([id]) => id));
+      const customerById = new Map(customers.flatMap(customer => [
+        [String(customer.id || ''), customer],
+        [String(customer._id || ''), customer]
+      ]).filter(([id]) => id));
+
       const storedDocuments = await this.db.collection('documents', { projection: { fileData: 0 } }).find({}, { projection: { fileData: 0 } }).sort({ uploadedAt: -1 }).toArray();
       // Some older recruitment saves store the document only in the trainee
       // record. Expose those mirrored records too, so the Vault and the
@@ -148,7 +156,7 @@ export class DocumentController {
         ...storedDocuments,
         ...candidateDocumentFallbacks.filter(document => !storedKeys.has(`${document.targetId}|${document.path || document.url}|${document.category || ''}`))
       ];
-      const liveDocuments = documents.filter(document => {
+      let liveDocuments = documents.filter(document => {
         const type = String(document.targetType || '').toLowerCase();
         const targetId = String(document.targetId || '');
         if (type === 'advisor' || type === 'advisors') return advisorById.has(targetId);
@@ -160,13 +168,42 @@ export class DocumentController {
           ? advisorById.get(String(document.targetId || ''))
           : (type === 'candidate' || type === 'candidates' || type === 'recruitment')
           ? candidateById.get(String(document.targetId || ''))
+          : (type === 'customer' || type === 'customers')
+          ? customerById.get(String(document.targetId || ''))
           : null;
         return {
           ...document,
           _id: undefined,
-          ownerName: owner?.fullName || owner?.name || null
+          ownerName: owner?.fullName || owner?.name || null,
+          ownerCreatedBy: owner?.createdBy || document.createdBy || null
         };
       });
+
+      // Strict role-based isolation:
+      if (role === 'Staff' && username) {
+        // Staff only sees documents for their own customers
+        liveDocuments = liveDocuments.filter(doc => {
+          const type = String(doc.targetType || '').toLowerCase();
+          if (type === 'customer' || type === 'customers') {
+            const cust = customerById.get(String(doc.targetId || ''));
+            return (cust && cust.createdBy === username) || doc.createdBy === username || doc.ownerCreatedBy === username;
+          }
+          return false;
+        });
+      } else if (supervise === 'true' || req.query.all === 'true') {
+        // Superadmin full view
+      } else {
+        // Default SuperAdmin view: exclude documents belonging to staff customers
+        liveDocuments = liveDocuments.filter(doc => {
+          const type = String(doc.targetType || '').toLowerCase();
+          if (type === 'customer' || type === 'customers') {
+            const cust = customerById.get(String(doc.targetId || ''));
+            return !cust?.createdBy || cust.createdBy === 'admin';
+          }
+          return true;
+        });
+      }
+
       res.json({ success: true, documents: liveDocuments });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -210,6 +247,7 @@ export class DocumentController {
         verificationStatus: 'PENDING',
         rejectionReason: null,
         uploadedAt: new Date().toISOString(),
+        createdBy: req.body.createdBy || req.query.username || 'admin',
       };
 
       // A replacement is one logical document, not an extra vault entry.

@@ -39,6 +39,7 @@ export class PolicyController {
       const data = { ...req.body };
       data.id = data.id || `pol-${Date.now().toString().slice(-5)}`;
       data.pendingStageSince = data.pendingStageSince || new Date().toISOString().split('T')[0];
+      data.createdBy = data.createdBy || req.query.username || 'admin';
 
       // Safeguard collections
       data.quotes = data.quotes || [];

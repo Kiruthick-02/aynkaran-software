@@ -17,10 +17,10 @@ import {
  * Sidebar Component
  * Matches the exact design and 9-item structure of the Aynkaran Consultants dashboard.
  */
-const Sidebar = ({ activeTab, setActiveTab, onLogout, adminUsername = "SuperAdmin" }) => {
+const Sidebar = ({ activeTab, setActiveTab, onLogout, adminUsername = "SuperAdmin", userRole = "SuperAdmin" }) => {
   
   // The specific 9 modules from your screenshot requirement
-  const menuItems = [
+  const rawMenuItems = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
     { id: 'policies', name: 'Companies & Policies', icon: Building2 },
     { id: 'recruitment', name: 'Agent Recruitment', icon: UserCheck },
@@ -31,6 +31,14 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, adminUsername = "SuperAdmi
     { id: 'reports', name: 'Exports & Reports', icon: FileText },
     { id: 'content', name: 'Content Publishing', icon: Globe },
   ];
+
+  // Restrict access for Staff users: remove recruitment, content, and staff_management
+  const menuItems = rawMenuItems.filter(item => {
+    if (userRole === 'Staff') {
+      return item.id !== 'recruitment' && item.id !== 'content' && item.id !== 'staff_management';
+    }
+    return true;
+  });
 
   return (
     <aside className="w-72 bg-[#1b3b8c] flex flex-col h-full text-white shrink-0 shadow-2xl">
