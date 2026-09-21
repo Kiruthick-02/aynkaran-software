@@ -1,7 +1,4 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+
 
 import jwt from 'jsonwebtoken';
 import { sendEmailReceipt } from '../utils/emailService.js';

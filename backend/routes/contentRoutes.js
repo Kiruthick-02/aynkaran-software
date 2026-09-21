@@ -4,7 +4,6 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { ObjectId } from 'mongodb';
-import { uploadBufferToStorage, toPublicHttpsUrl } from '../utils/storageService.js';
 
 const uploadDir = path.join(process.cwd(), 'uploads', 'content');
 if (!fs.existsSync(uploadDir)) {
@@ -30,7 +29,6 @@ function publicPath(filename) {
 }
 
 function shapeNews(doc) {
-  const imgUrl = toPublicHttpsUrl(doc.coverImage || doc.image);
   return {
     id: doc.id || doc._id?.toString(),
     title: doc.title,
@@ -38,8 +36,6 @@ function shapeNews(doc) {
     category: doc.category,
     coverImage: doc.coverImage || doc.image,
     image: doc.coverImage || doc.image,
-    coverImage: imgUrl,
-    image: imgUrl,
     publishDate: doc.publishDate,
     readTime: doc.readTime || '4 min read',
     author: doc.author || 'Aynkaran Team',
@@ -50,12 +46,9 @@ function shapeNews(doc) {
 
 function shapeGallery(doc) {
   const url = doc.url || doc.image || '';
-  const rawUrl = doc.url || doc.image || '';
-  const publicMediaUrl = toPublicHttpsUrl(rawUrl);
   const type =
     doc.type ||
     (/\.(mp4|webm|mov|m4v|ogg)$/i.test(url) ? 'video' : 'image');
-    (/\.(mp4|webm|mov|m4v|ogg)$/i.test(rawUrl) ? 'video' : 'image');
   return {
     id: doc.id || doc._id?.toString(),
     title: doc.title,
@@ -63,8 +56,6 @@ function shapeGallery(doc) {
     description: doc.description || '',
     url,
     image: doc.image || doc.url || url,
-    url: publicMediaUrl,
-    image: publicMediaUrl,
     type,
   };
 }
@@ -75,7 +66,6 @@ function shapePoster(doc) {
     audience: doc.audience || 'customers',
     order: typeof doc.order === 'number' ? doc.order : 0,
     url: doc.url,
-    url: toPublicHttpsUrl(doc.url),
     fileName: doc.fileName || '',
     updatedAt: doc.updatedAt,
   };
@@ -101,7 +91,6 @@ export function contentRoutes(db) {
   const categoriesCol = db.collection('content_categories');
 
   // ---------- ALL CONTENT ----------
-  // ---------- ALL CONTENT (GET /api/content) ----------
   router.get('/', async (_req, res) => {
     try {
       const posterDocs = await postersCol.find({}).sort({ order: 1, updatedAt: -1 }).toArray();
@@ -197,7 +186,6 @@ export function contentRoutes(db) {
   });
 
   // ---------- POSTERS ----------
-  // ---------- POSTERS (GET /api/content/posters) ----------
   router.get('/posters', async (_req, res) => {
     try {
       const docs = await postersCol.find({}).sort({ order: 1 }).toArray();
@@ -224,12 +212,8 @@ export function contentRoutes(db) {
       }
       if (!req.file) return res.status(400).json({ error: 'file is required' });
 
-      // Save to persistent storage
-      const buffer = fs.readFileSync(req.file.path);
-      const storageResult = await uploadBufferToStorage(buffer, req.file.filename, 'content', req.file.mimetype);
-      const url = storageResult.publicUrl || toPublicHttpsUrl(`/uploads/content/${req.file.filename}`);
-
       const count = await postersCol.countDocuments({ audience });
+      const url = publicPath(req.file.filename);
       const doc = {
         audience,
         order: count,
@@ -353,7 +337,6 @@ export function contentRoutes(db) {
   });
 
   // ---------- NEWS ----------
-  // ---------- NEWS (GET /api/content/news) ----------
   router.get('/news', async (_req, res) => {
     try {
       const rows = await newsCol.find({}).sort({ createdAt: -1 }).toArray();
@@ -369,11 +352,7 @@ export function contentRoutes(db) {
       if (!title) return res.status(400).json({ error: 'title is required' });
       if (!req.file) return res.status(400).json({ error: 'cover image is required' });
 
-      // Save to persistent storage
-      const buffer = fs.readFileSync(req.file.path);
-      const storageResult = await uploadBufferToStorage(buffer, req.file.filename, 'content', req.file.mimetype);
-      const coverImage = storageResult.publicUrl || toPublicHttpsUrl(`/uploads/content/${req.file.filename}`);
-
+      const coverImage = publicPath(req.file.filename);
       const description = (req.body.description || '').trim();
       if (!description) return res.status(400).json({ error: 'description is required' });
 
@@ -416,7 +395,6 @@ export function contentRoutes(db) {
   });
 
   // ---------- GALLERY ----------
-  // ---------- GALLERY (GET /api/content/gallery) ----------
   router.get('/gallery', async (_req, res) => {
     try {
       const rows = await galleryCol.find({}).sort({ createdAt: -1 }).toArray();
@@ -432,11 +410,7 @@ export function contentRoutes(db) {
       if (!title) return res.status(400).json({ error: 'title is required' });
       if (!req.file) return res.status(400).json({ error: 'file is required' });
 
-      // Save to persistent storage
-      const buffer = fs.readFileSync(req.file.path);
-      const storageResult = await uploadBufferToStorage(buffer, req.file.filename, 'content', req.file.mimetype);
-      const url = storageResult.publicUrl || toPublicHttpsUrl(`/uploads/content/${req.file.filename}`);
-
+      const url = publicPath(req.file.filename);
       const isVideo =
         (req.file.mimetype && req.file.mimetype.startsWith('video/')) ||
         /\.(mp4|webm|mov|m4v|ogg)$/i.test(req.file.originalname || '');

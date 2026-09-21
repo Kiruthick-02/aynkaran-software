@@ -1,3 +1,5 @@
+//src/hooks/useSync.js
+
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { apiService } from '../services/api';

@@ -14,7 +14,6 @@ import { documentRoutes } from './routes/documentRoutes.js';
 import { enquiryRoutes } from './routes/enquiryRoutes.js';
 import { contentRoutes } from './routes/contentRoutes.js';
 import { advisorRoutes } from './routes/advisorRoutes.js';
-import { initStorage, serveMediaHandler } from './utils/storageService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,22 +22,16 @@ const ROOT_UPLOADS = path.join(__dirname, 'uploads');
 export function createExpressApp(db) {
   const app = express();
 
-  // Initialize persistent GridFS bucket
-  initStorage(db);
-
   /**
    * ==========================================
    * CORS CONFIGURATION
    * ==========================================
    */
   const allowedOrigins = [
-    'http://localhost:3000',   // Website frontend (React / Next)
-    'http://127.0.0.1:3000',
-    'http://localhost:5173',   // Desktop frontend (Vite)
+    'http://localhost:5173',   // Desktop frontend
     'http://127.0.0.1:5173',
-    'http://localhost:7860',   // Local unified dev server
-    'http://127.0.0.1:7860',
-    'https://aynkaran-backend.onrender.com',
+    'http://localhost:3000',   // Website frontend
+    'http://127.0.0.1:3000',
   ];
   const configuredFrontendOrigins = String(process.env.FRONTEND_URL || '')
     .split(',')
@@ -50,13 +43,10 @@ export function createExpressApp(db) {
       if (!origin) return callback(null, true);
       if (
         allowedOrigins.includes(origin) ||
-        origin.includes('.onrender.com') ||
-        origin.includes('.vercel.app') ||
         origin.includes('up.railway.app') ||
         origin.includes('.hf.space') ||
         origin.includes('huggingface.co') ||
-        origin.includes('localhost') ||
-        origin.includes('127.0.0.1') ||
+        origin.includes('.vercel.app') ||
         configuredFrontendOrigins.includes(origin)
       ) {
         return callback(null, true);
@@ -65,7 +55,7 @@ export function createExpressApp(db) {
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept'],
   }));
 
   app.options('*', cors());
@@ -78,19 +68,7 @@ export function createExpressApp(db) {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-  // Persistent Media Streaming Endpoints (GridFS + Fallback)
-  app.get('/api/uploads/:folder/:filename', serveMediaHandler);
-  app.get('/uploads/:folder/:filename', serveMediaHandler);
-  app.get('/api/uploads/:filename', (req, res) => {
-    req.params.folder = 'misc';
-    return serveMediaHandler(req, res);
-  });
-  app.get('/uploads/:filename', (req, res) => {
-    req.params.folder = 'misc';
-    return serveMediaHandler(req, res);
-  });
-
-  // Local filesystem static file serving fallback
+  // Serve document uploads
   app.use('/uploads', express.static(ROOT_UPLOADS));
   app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
@@ -116,7 +94,7 @@ export function createExpressApp(db) {
   app.put('/api/policies/:id', policyController.update);
   app.delete('/api/policies/:id', policyController.delete);
 
-  // 3.2 Insurance company / product scheme / public catalog endpoints
+  // 3.2 Insurance company / product scheme endpoints
   app.use('/api', policyRoutes(db));
 
   // 4. Recruitment & Candidates
@@ -132,7 +110,7 @@ export function createExpressApp(db) {
   // 7. Advisor Management Domain & Lifecycle
   app.use('/api/advisors', advisorRoutes(db));
 
-  // 8. Content Publishing & Public Media API
+  // 8. Content Publishing API
   app.use('/api/content', contentRoutes(db));
 
   /**
@@ -144,8 +122,8 @@ export function createExpressApp(db) {
     res.status(200).json({
       success: true,
       status: 'healthy',
-      engine: 'MongoDB Atlas GridFS + Document',
-      service: 'Aynkaran Business Management System Backend',
+      engine: 'MongoDB Document',
+      service: 'Aynkaran Desk CRM Core Server',
       timestamp: new Date().toISOString(),
       publicEnquiryStatus: 'Open'
     });
