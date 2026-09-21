@@ -3300,7 +3300,7 @@ const handleDeletePolicy = async (policyId, policyName) => {
               onChange={(e) =>
                 setEditCompanyContact(e.target.value.replace(/\D/g, '').slice(0, 15))
               }
-              maxLength={15}
+              maxLength={10}
               placeholder="+91"
               className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-white outline-none focus:border-blue-500"
             />
