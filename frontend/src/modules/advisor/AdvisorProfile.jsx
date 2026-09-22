@@ -26,7 +26,8 @@ const TABS = [
 
 const ADVISOR_DOCUMENT_TYPES = [
   { key: 'passport_photo', name: 'Passport Size Photo', required: true, icon: User },
-  { key: 'aadhaar_card', name: 'Aadhaar Card', required: true, icon: ShieldCheck },
+  { key: 'aadhaar_card_front', name: 'Aadhaar Card (Front Side)', required: true, icon: ShieldCheck },
+  { key: 'aadhaar_card_back', name: 'Aadhaar Card (Back Side)', required: true, icon: ShieldCheck },
   { key: 'pan_card', name: 'PAN Card', required: true, icon: FileText },
   { key: 'bank_proof', name: 'Bank Passbook / Cancelled Cheque', required: true, icon: FileText },
   { key: 'education_certificate', name: 'Highest Education Certificate / Marksheet', required: true, icon: Award },
@@ -35,9 +36,15 @@ const ADVISOR_DOCUMENT_TYPES = [
 
 const documentMatchesType = (doc, key) => {
   const text = `${doc?.category || ''} ${doc?.name || ''} ${doc?.fileName || ''}`.toLowerCase();
+  if (key === 'aadhaar_card_front') {
+    if (text.includes('back')) return false;
+    return text.includes('front') || text.includes('aadhaar') || text.includes('aadhar');
+  }
+  if (key === 'aadhaar_card_back') {
+    return text.includes('back') && (text.includes('aadhaar') || text.includes('aadhar'));
+  }
   const keywords = {
     passport_photo: ['passport', 'photo', 'photograph'],
-    aadhaar_card: ['aadhaar', 'aadhar'],
     pan_card: ['pan'],
     bank_proof: ['bank', 'passbook', 'cheque'],
     education_certificate: ['education', 'certificate', 'marksheet', 'mark sheet'],
@@ -143,8 +150,15 @@ export default function AdvisorProfile({
         verificationStatus: 'PENDING',
         uploadedAt: new Date().toISOString()
       };
+      const docPath = uploadResult.url || uploadResult.path;
+      const isPhoto = category.toLowerCase().includes('photo') || category.toLowerCase().includes('passport');
       setAdvisorData(previous => previous ? {
         ...previous,
+        ...(isPhoto ? {
+          photoUrl: docPath,
+          profilePicture: docPath,
+          passportPhoto: docPath
+        } : {}),
         documents: [
           ...(previous.documents || []).filter(document => document.category !== category),
           uploadedDoc
@@ -279,6 +293,10 @@ export default function AdvisorProfile({
     ? adv.fullName.trim()
     : 'Advisor';
 
+  const photoDoc = (adv.documents || []).find(item => documentMatchesType(item, 'passport_photo'));
+  const avatarPath = adv.photoUrl || adv.profilePicture || adv.passportPhoto || adv.candidate?.photoUrl || adv.candidate?.profilePicture || adv.candidate?.passportPhoto || photoDoc?.url || photoDoc?.path || null;
+  const resolvedAvatarUrl = avatarPath ? resolveDocumentUrl(avatarPath) : null;
+
   return (
     <div className="space-y-6 animate-fade-in" id="advisor-profile-view">
       <div className="bg-[#1e293b] border border-slate-800 rounded-3xl p-6 shadow-xl space-y-5">
@@ -291,7 +309,21 @@ export default function AdvisorProfile({
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <div className="w-16 h-16 rounded-2xl bg-blue-600/20 border-2 border-blue-500/40 text-blue-400 flex items-center justify-center text-2xl font-black italic shadow-inner">
+            {resolvedAvatarUrl ? (
+              <img
+                src={resolvedAvatarUrl}
+                alt={displayName}
+                className="w-16 h-16 rounded-2xl object-cover border-2 border-blue-500/40 shadow-inner bg-slate-900 shrink-0"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const fallback = e.currentTarget.nextElementSibling;
+                  if (fallback) fallback.style.display = 'flex';
+                }}
+              />
+            ) : null}
+            <div
+              className={`w-16 h-16 rounded-2xl bg-blue-600/20 border-2 border-blue-500/40 text-blue-400 flex items-center justify-center text-2xl font-black italic shadow-inner shrink-0 ${resolvedAvatarUrl ? 'hidden' : ''}`}
+            >
               {displayName.split(/\s+/).map(namePart => namePart[0]).join('').slice(0, 2)}
             </div>
             <div>

@@ -66,6 +66,8 @@ export class AdvisorController {
             $set: {
               documents: [],
               aadhaarUrl: null,
+              aadhaarFrontUrl: null,
+              aadhaarBackUrl: null,
               panUrl: null,
               photoUrl: null,
               profilePicture: null,
@@ -257,6 +259,11 @@ export class AdvisorController {
       }
 
       const allPolicies = await this.db.collection('policies').find().toArray();
+      const allCandidates = await this.db.collection('candidates').find().toArray();
+      const candMap = new Map(allCandidates.flatMap(c => [
+        [String(c.id || ''), c],
+        [String(c._id || ''), c]
+      ]).filter(([k]) => k));
 
       const formatted = list.map(a => {
         const advPolicies = allPolicies.filter(p =>
@@ -272,15 +279,35 @@ export class AdvisorController {
         const totalPrem = advPolicies.reduce((acc, p) => acc + (Number(p.premiumAmount) || 0), 0);
         const totalComm = advPolicies.reduce((acc, p) => acc + (Number(p.commissionAmount) || (Number(p.premiumAmount || 0) * 0.15)), 0);
 
+        const cand = a.candidateId ? candMap.get(String(a.candidateId)) : null;
+        const advDocs = Array.isArray(a.documents) ? a.documents : [];
+        const candDocs = Array.isArray(cand?.documents) ? cand.documents : [];
+        const docMap = new Map();
+        [...candDocs, ...advDocs].forEach(d => {
+          if (d && (d.category || d.name)) {
+            docMap.set(d.category || d.name, d);
+          }
+        });
+        const mergedDocs = Array.from(docMap.values());
+        const photoUrl = a.photoUrl || a.profilePicture || a.passportPhoto ||
+          cand?.photoUrl || cand?.profilePicture || cand?.passportPhoto ||
+          mergedDocs.find(d => {
+            const cat = (d.category || d.name || '').toLowerCase();
+            return cat.includes('photo') || cat.includes('passport') || cat.includes('profile');
+          })?.url || null;
+
         return {
           ...a,
           id: a.id || a._id.toString(),
           _id: undefined,
+          photoUrl,
+          profilePicture: photoUrl,
+          passportPhoto: photoUrl,
           activePoliciesCount: activePolicies.length,
           totalPoliciesCount: advPolicies.length,
           totalPremium: totalPrem,
           totalCommission: totalComm,
-          documents: Array.isArray(a.documents) ? a.documents : [],
+          documents: mergedDocs,
           statusHistory: Array.isArray(a.statusHistory) ? a.statusHistory : []
         };
       });
@@ -349,11 +376,32 @@ export class AdvisorController {
       const totalPrem = policies.reduce((acc, p) => acc + (Number(p.premiumAmount) || 0), 0);
       const totalComm = policies.reduce((acc, p) => acc + (Number(p.commissionAmount) || (Number(p.premiumAmount || 0) * 0.15)), 0);
 
+      // Merge documents from advisor + candidate
+      const advisorDocs = Array.isArray(advisor.documents) ? advisor.documents : [];
+      const candidateDocs = Array.isArray(candidate?.documents) ? candidate.documents : [];
+      const docMap = new Map();
+      [...candidateDocs, ...advisorDocs].forEach(d => {
+        if (d && (d.category || d.name)) {
+          docMap.set(d.category || d.name, d);
+        }
+      });
+      const mergedDocs = Array.from(docMap.values());
+      const photoUrl = advisor.photoUrl || advisor.profilePicture || advisor.passportPhoto ||
+        candidate?.photoUrl || candidate?.profilePicture || candidate?.passportPhoto ||
+        mergedDocs.find(d => {
+          const cat = (d.category || d.name || '').toLowerCase();
+          return cat.includes('photo') || cat.includes('passport') || cat.includes('profile');
+        })?.url || null;
+
       const responseObj = {
         ...advisor,
         id: advisor.id || advisor._id.toString(),
         _id: undefined,
         candidate,
+        photoUrl,
+        profilePicture: photoUrl,
+        passportPhoto: photoUrl,
+        documents: mergedDocs,
         policies: policies.map(p => ({ ...p, id: p.id || p._id.toString(), _id: undefined })),
         customers: customers.map(c => ({ ...c, id: c.id || c._id.toString(), _id: undefined })),
         milestones: milestones.map(m => ({ ...m, _id: undefined })),
@@ -617,6 +665,17 @@ export class AdvisorController {
           }
         ],
         documents: candidateDocs,
+        photoUrl: candidate.photoUrl || candidate.profilePicture || candidate.passportPhoto || null,
+        profilePicture: candidate.profilePicture || candidate.photoUrl || candidate.passportPhoto || null,
+        passportPhoto: candidate.passportPhoto || candidate.photoUrl || candidate.profilePicture || null,
+        photoFileName: candidate.photoFileName || null,
+        aadhaarFrontUrl: candidate.aadhaarFrontUrl || null,
+        aadhaarBackUrl: candidate.aadhaarBackUrl || null,
+        aadhaarUrl: candidate.aadhaarUrl || null,
+        panUrl: candidate.panUrl || null,
+        bankProofUrl: candidate.bankProofUrl || null,
+        marksheetUrl: candidate.marksheetUrl || null,
+        signatureUrl: candidate.signatureUrl || null,
         createdBy: convertedBy,
         updatedBy: convertedBy,
         createdAt: now,

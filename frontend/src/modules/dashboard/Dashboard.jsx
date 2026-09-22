@@ -127,10 +127,14 @@ export default function Dashboard({
 
   // Missing KYC slots count
   const totalMissingKycCount = useMemo(() => {
-    const requiredKyc = ['incomeProof', 'educationCertificate', 'aadhaarCard', 'panCard', 'passportSizePhoto'];
+    const requiredKyc = ['incomeProof', 'educationCertificate', 'panCard', 'passportSizePhoto'];
     return customers.reduce((acc, cust) => {
       const kyc = cust.kycDocuments || {};
-      const missing = requiredKyc.filter((key) => !kyc[key] && !cust[key + 'Url']).length;
+      let missing = requiredKyc.filter((key) => !kyc[key] && !cust[key + 'Url'] && !cust[key + 'File']).length;
+      const hasAadhaarFront = kyc.aadhaarFront || cust.aadhaarFrontUrl || cust.aadhaarFrontFile || kyc.aadhaarCard || cust.aadhaarCardUrl || cust.aadhaarUrl;
+      const hasAadhaarBack = kyc.aadhaarBack || cust.aadhaarBackUrl || cust.aadhaarBackFile;
+      if (!hasAadhaarFront) missing++;
+      if (!hasAadhaarBack) missing++;
       return acc + missing;
     }, 0);
   }, [customers]);

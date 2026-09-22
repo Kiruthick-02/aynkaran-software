@@ -14,6 +14,7 @@ import { documentRoutes } from './routes/documentRoutes.js';
 import { enquiryRoutes } from './routes/enquiryRoutes.js';
 import { contentRoutes } from './routes/contentRoutes.js';
 import { advisorRoutes } from './routes/advisorRoutes.js';
+import { gridfsMediaHandler } from './middleware/gridfsStream.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,11 +23,6 @@ const ROOT_UPLOADS = path.join(__dirname, 'uploads');
 export function createExpressApp(db) {
   const app = express();
 
-  /**
-   * ==========================================
-   * CORS CONFIGURATION
-   * ==========================================
-   */
   const allowedOrigins = [
     'http://localhost:5173',   // Desktop frontend
     'http://127.0.0.1:5173',
@@ -68,7 +64,9 @@ export function createExpressApp(db) {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-  // Serve document uploads
+  // Serve document uploads & media from disk or GridFS
+  app.use('/uploads', gridfsMediaHandler(db));
+  app.use('/api/uploads', gridfsMediaHandler(db));
   app.use('/uploads', express.static(ROOT_UPLOADS));
   app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
@@ -112,7 +110,7 @@ export function createExpressApp(db) {
 
   // 8. Content Publishing API
   app.use('/api/content', contentRoutes(db));
-
+  
   /**
    * ==========================================
    * HEALTH CHECK ROUTE

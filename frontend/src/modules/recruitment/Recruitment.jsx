@@ -72,7 +72,7 @@ export default function Recruitment({ candidates = [], addCandidate, updateCandi
   const [tempExamResult, setTempExamResult] = useState('Pass');
   const [tempAgentCode, setTempAgentCode] = useState('');
 
-  const [uploadCategory, setUploadCategory] = useState('Aadhaar');
+  const [uploadCategory, setUploadCategory] = useState('Aadhaar Front');
   const [uploadFileName, setUploadFileName] = useState('');
 
   const [isEditingInfo, setIsEditingInfo] = useState(false);
@@ -813,6 +813,8 @@ export default function Recruitment({ candidates = [], addCandidate, updateCandi
                               <label className="block text-[9.5px] font-extrabold text-slate-500 uppercase tracking-wider">Backdate License Generation (Simulation)</label>
                               <input
                                 type="date"
+                                min="1900-01-01"
+                                max="2099-12-31"
                                 value={selectedCandidate.exam?.agentCodeGeneratedAt || selectedCandidate.createdAt?.split('T')[0] || ''}
                                 onChange={(e) => {
                                   const updated = {
@@ -824,7 +826,7 @@ export default function Recruitment({ candidates = [], addCandidate, updateCandi
                                   };
                                   updateCandidate(selectedCandidate.id, updated);
                                 }}
-                                className="bg-white border border-slate-350 rounded p-1 text-xs w-full text-zinc-800 focus:ring-1 focus:ring-indigo-500"
+                                className="bg-white border border-slate-355 rounded p-1 text-xs w-full text-zinc-800 focus:ring-1 focus:ring-indigo-500"
                               />
                             </div>
                           </div>
@@ -892,6 +894,8 @@ export default function Recruitment({ candidates = [], addCandidate, updateCandi
                       <div className="flex flex-col sm:flex-row gap-2.5">
                         <input
                           type="date"
+                          min="1900-01-01"
+                          max="2099-12-31"
                           value={tempApptDate || selectedCandidate.appointmentDate || ''}
                           onChange={(e) => setTempApptDate(e.target.value)}
                           className="bg-white border border-slate-350 rounded-lg p-2 text-slate-800 text-xs flex-1 focus:ring-1 focus:ring-indigo-500"
@@ -961,7 +965,8 @@ export default function Recruitment({ candidates = [], addCandidate, updateCandi
                             onChange={(e) => setUploadCategory(e.target.value)}
                             className="flex-1 bg-white border border-slate-300 rounded-lg p-1 text-xs text-slate-800"
                           >
-                            <option value="Aadhaar">Aadhaar Card</option>
+                            <option value="Aadhaar Front">Aadhaar Card (Front Side)</option>
+                            <option value="Aadhaar Back">Aadhaar Card (Back Side)</option>
                             <option value="PAN">PAN Card</option>
                             <option value="Education">SSLC / Degree Book</option>
                             <option value="Receipt">Fee Receipt</option>

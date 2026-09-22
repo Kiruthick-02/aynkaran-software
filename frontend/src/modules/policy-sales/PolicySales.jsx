@@ -435,6 +435,8 @@ export default function PolicySales({ policies = [], addPolicy, updatePolicy, de
                           <label className="block text-[11px] font-bold text-slate-600">Company Booking Date</label>
                           <input
                             type="date"
+                            min="1900-01-01"
+                            max="2099-12-31"
                             value={issuedDateStr}
                             onChange={(e) => setIssuedDateStr(e.target.value)}
                             className="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-xs text-slate-800"
@@ -448,6 +450,8 @@ export default function PolicySales({ policies = [], addPolicy, updatePolicy, de
                         <label className="block text-[11px] font-bold text-slate-600">Renewal Outflow Deadline</label>
                         <input
                           type="date"
+                          min="1900-01-01"
+                          max="2099-12-31"
                           value={renewalDateStr}
                           onChange={(e) => setRenewalDateStr(e.target.value)}
                           className="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-xs text-slate-800"

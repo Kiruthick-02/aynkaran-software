@@ -302,6 +302,8 @@ export default function EditCandidateModal({
                   <label className="text-[10px] uppercase font-bold text-slate-400 block">Date of Birth</label>
                   <input
                     type="date"
+                    min="1900-01-01"
+                    max="2099-12-31"
                     value={formData.dateOfBirth}
                     onChange={e => setFormData({ ...formData, dateOfBirth: e.target.value })}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs focus:outline-none focus:border-blue-500"

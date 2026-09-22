@@ -12,6 +12,12 @@ const ROOT_UPLOADS = path.join(__dirname, '..', 'uploads');
  * so Documents vault + Customers module can read them.
  */
 const CATEGORY_FIELD_MAP = {
+  aadhaarfront: { url: 'aadhaarFrontUrl', fileName: 'aadhaarFrontFileName', kycKey: 'aadhaarFront' },
+  aadhaarcardfront: { url: 'aadhaarFrontUrl', fileName: 'aadhaarFrontFileName', kycKey: 'aadhaarFront' },
+  aadhaarfrontside: { url: 'aadhaarFrontUrl', fileName: 'aadhaarFrontFileName', kycKey: 'aadhaarFront' },
+  aadhaarback: { url: 'aadhaarBackUrl', fileName: 'aadhaarBackFileName', kycKey: 'aadhaarBack' },
+  aadhaarcardback: { url: 'aadhaarBackUrl', fileName: 'aadhaarBackFileName', kycKey: 'aadhaarBack' },
+  aadhaarbackside: { url: 'aadhaarBackUrl', fileName: 'aadhaarBackFileName', kycKey: 'aadhaarBack' },
   aadhaar: { url: 'aadhaarUrl', fileName: 'aadhaarFileName', kycKey: 'aadhaar' },
   aadhaarcard: { url: 'aadhaarUrl', fileName: 'aadhaarFileName', kycKey: 'aadhaar' },
   photo: { url: 'photoUrl', fileName: 'photoFileName', kycKey: 'passportSizePhoto' },
@@ -87,7 +93,7 @@ export class DocumentController {
         await this.db.collection('documents').deleteMany({ targetId: { $in: orphanCandidateIds } });
         await this.db.collection('candidates').updateMany(
           { $or: [{ id: { $in: orphanCandidateIds } }, { _id: { $in: orphanCandidateIds } }] },
-          { $set: { documents: [], aadhaarUrl: null, panUrl: null, photoUrl: null, profilePicture: null, passportPhoto: null, marksheetUrl: null, bankProofUrl: null, signatureUrl: null, licenseDocumentUrl: null } }
+          { $set: { documents: [], aadhaarUrl: null, aadhaarFrontUrl: null, aadhaarBackUrl: null, panUrl: null, photoUrl: null, profilePicture: null, passportPhoto: null, marksheetUrl: null, bankProofUrl: null, signatureUrl: null, licenseDocumentUrl: null } }
         );
       }
 
@@ -373,7 +379,17 @@ export class DocumentController {
             $set.passportPhotoUrl = publicPath;
             $set.photoFileName = originalName;
           }
-          if (catKey.includes('aadhaar')) {
+          if (catKey.includes('aadhaarfront') || (catKey.includes('aadhaar') && catKey.includes('front')) || (catKey.includes('aadhar') && catKey.includes('front'))) {
+            $set.aadhaarFrontUrl = publicPath;
+            $set.aadhaarFrontFile = publicPath;
+            $set.aadhaarFrontDocUrl = publicPath;
+            $set.aadhaarFrontFileName = originalName;
+          } else if (catKey.includes('aadhaarback') || (catKey.includes('aadhaar') && catKey.includes('back')) || (catKey.includes('aadhar') && catKey.includes('back'))) {
+            $set.aadhaarBackUrl = publicPath;
+            $set.aadhaarBackFile = publicPath;
+            $set.aadhaarBackDocUrl = publicPath;
+            $set.aadhaarBackFileName = originalName;
+          } else if (catKey.includes('aadhaar') || catKey.includes('aadhar')) {
             $set.aadhaarUrl = publicPath;
             $set.aadhaarFile = publicPath;
             $set.aadhaarDocUrl = publicPath;
@@ -408,6 +424,20 @@ export class DocumentController {
             { $or: [{ id: targetId }, { _id: targetId }, { id: candidate.id }, { _id: candidate._id }] },
             { $set }
           );
+
+          // Two-way sync: update linked advisor record if candidate is converted
+          const candIdStr = String(candidate.id || candidate._id || targetId);
+          await this.db.collection('advisors').updateMany(
+            {
+              $or: [
+                { candidateId: candIdStr },
+                { candidateId: targetId },
+                ...(candidate.convertedAdvisorId ? [{ id: candidate.convertedAdvisorId }] : []),
+                ...(candidate.convertedAdvisorCode ? [{ advisorCode: candidate.convertedAdvisorCode }] : [])
+              ]
+            },
+            { $set: { ...$set, updatedAt: new Date().toISOString() } }
+          );
         }
       }
 
@@ -440,10 +470,72 @@ export class DocumentController {
           const filteredDocs = docs.filter(doc => String(doc.category || doc.label || '') !== String(category));
           filteredDocs.push(syncedDoc);
 
+          const $set = {
+            documents: filteredDocs,
+            updatedAt: new Date().toISOString(),
+          };
+
+          const catKey = normalizeCategory(category);
+          if (catKey.includes('photo') || catKey.includes('profile') || catKey.includes('passport')) {
+            $set.profilePicture = publicPath;
+            $set.photoUrl = publicPath;
+            $set.passportPhoto = publicPath;
+            $set.passportPhotoUrl = publicPath;
+            $set.photoFileName = originalName;
+          }
+          if (catKey.includes('aadhaarfront') || (catKey.includes('aadhaar') && catKey.includes('front')) || (catKey.includes('aadhar') && catKey.includes('front'))) {
+            $set.aadhaarFrontUrl = publicPath;
+            $set.aadhaarFrontFile = publicPath;
+            $set.aadhaarFrontDocUrl = publicPath;
+            $set.aadhaarFrontFileName = originalName;
+          } else if (catKey.includes('aadhaarback') || (catKey.includes('aadhaar') && catKey.includes('back')) || (catKey.includes('aadhar') && catKey.includes('back'))) {
+            $set.aadhaarBackUrl = publicPath;
+            $set.aadhaarBackFile = publicPath;
+            $set.aadhaarBackDocUrl = publicPath;
+            $set.aadhaarBackFileName = originalName;
+          } else if (catKey.includes('aadhaar') || catKey.includes('aadhar')) {
+            $set.aadhaarUrl = publicPath;
+            $set.aadhaarFile = publicPath;
+            $set.aadhaarDocUrl = publicPath;
+            $set.aadhaarFileName = originalName;
+          }
+          if (catKey.includes('pan')) {
+            $set.panUrl = publicPath;
+            $set.panFile = publicPath;
+            $set.panDoc = publicPath;
+            $set.panFileName = originalName;
+          }
+          if (catKey.includes('bank') || catKey.includes('cheque') || catKey.includes('passbook')) {
+            $set.bankProofUrl = publicPath;
+            $set.bankProofFile = publicPath;
+            $set.bankProofDoc = publicPath;
+            $set.bankProofFileName = originalName;
+          }
+          if (catKey.includes('education') || catKey.includes('marksheet') || catKey.includes('certificate')) {
+            $set.marksheetUrl = publicPath;
+            $set.marksheetFile = publicPath;
+            $set.marksheetDoc = publicPath;
+            $set.marksheetFileName = originalName;
+          }
+          if (catKey.includes('signature')) {
+            $set.signatureUrl = publicPath;
+            $set.signatureFile = publicPath;
+            $set.signatureDoc = publicPath;
+            $set.signatureFileName = originalName;
+          }
+
           await this.db.collection('advisors').updateOne(
             { $or: [{ id: targetId }, { advisorCode: targetId }, { id: advisor.id }, { _id: advisor._id }] },
-            { $set: { documents: filteredDocs, updatedAt: new Date().toISOString() } }
+            { $set }
           );
+
+          // Two-way sync: update linked candidate record
+          if (advisor.candidateId) {
+            await this.db.collection('candidates').updateMany(
+              { $or: [{ id: advisor.candidateId }, { _id: advisor.candidateId }] },
+              { $set }
+            );
+          }
         }
       }
 

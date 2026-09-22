@@ -319,7 +319,8 @@ export const STRICT_17_STAGES = [
 
 export const REQUIRED_KYC_TYPES = [
   { key: 'Passport Size Photo', name: 'Passport-Size Photo / Profile Icon', required: true, icon: Camera },
-  { key: 'Aadhaar Card copy', name: 'Aadhaar Card Copy', required: true, icon: FileText },
+  { key: 'Aadhaar Card (Front Side)', name: 'Aadhaar Card (Front Side)', required: true, icon: FileText },
+  { key: 'Aadhaar Card (Back Side)', name: 'Aadhaar Card (Back Side)', required: true, icon: FileText },
   { key: 'PAN Card copy', name: 'PAN Card Copy', required: true, icon: FileText },
   { key: 'Bank Proof', name: 'Bank Passbook / Cancelled Cheque', required: true, icon: FileText },
   { key: 'Education Certificate', name: 'Highest Education Certificate / Marksheet', required: true, icon: Award },
@@ -364,77 +365,118 @@ export default function AdvisorMilestoneTimeline({
       const stg = Number(candidate.stageNumber) || 1;
       setCurrentStageNumber(Math.min(Math.max(stg, 1), 10));
 
-      // Sync existing candidate documents
+      // Sync existing candidate & advisor documents
       const map = {};
-      let docs = [];
-      if (Array.isArray(candidate.documents)) {
-        docs = candidate.documents;
-      } else if (typeof candidate.documents === 'string' && candidate.documents.trim()) {
-        try {
-          const parsedDocuments = JSON.parse(candidate.documents);
-          docs = Array.isArray(parsedDocuments) ? parsedDocuments : [];
-        } catch (error) {
-          console.warn('[Advisor Milestone] Ignoring invalid candidate documents JSON', error);
+      const collectDocs = (sourceObj) => {
+        if (!sourceObj) return [];
+        if (Array.isArray(sourceObj.documents)) return sourceObj.documents;
+        if (typeof sourceObj.documents === 'string' && sourceObj.documents.trim()) {
+          try {
+            const parsed = JSON.parse(sourceObj.documents);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            return [];
+          }
         }
-      }
-      
-      docs.forEach(d => {
+        return [];
+      };
+
+      const allDocs = [...collectDocs(candidate), ...collectDocs(advisor)];
+      allDocs.forEach(d => {
         if (d && (d.category || d.name)) {
           map[d.category || d.name] = d;
         }
       });
 
-      if (candidate.photoUrl || candidate.profilePicture || candidate.passportPhoto) {
+      const cand = candidate || {};
+      const adv = advisor || {};
+
+      const photoPath = cand.photoUrl || cand.profilePicture || cand.passportPhoto || adv.photoUrl || adv.profilePicture || adv.passportPhoto;
+      if (photoPath) {
         map['Passport Size Photo'] = {
-          name: candidate.photoFileName || 'Passport Size Photo',
-          fileName: candidate.photoFileName || 'Passport Size Photo',
-          url: candidate.photoUrl || candidate.profilePicture || candidate.passportPhoto,
-          path: candidate.photoUrl || candidate.profilePicture || candidate.passportPhoto,
+          name: cand.photoFileName || adv.photoFileName || 'Passport Size Photo',
+          fileName: cand.photoFileName || adv.photoFileName || 'Passport Size Photo',
+          url: photoPath,
+          path: photoPath,
           verificationStatus: 'PENDING'
         };
       }
-      if (candidate.aadhaarUrl) {
-        map['Aadhaar Card copy'] = {
-          name: candidate.aadhaarFileName || 'Aadhaar Card copy',
-          fileName: candidate.aadhaarFileName || 'Aadhaar Card copy',
-          url: candidate.aadhaarUrl,
-          path: candidate.aadhaarUrl,
+
+      const aadhaarFrontPath = cand.aadhaarFrontUrl || cand.aadhaarFrontFile || adv.aadhaarFrontUrl || adv.aadhaarFrontFile;
+      const aadhaarFrontName = cand.aadhaarFrontFileName || adv.aadhaarFrontFileName || 'Aadhaar Card (Front Side)';
+      const aadhaarBackPath = cand.aadhaarBackUrl || cand.aadhaarBackFile || adv.aadhaarBackUrl || adv.aadhaarBackFile;
+      const aadhaarBackName = cand.aadhaarBackFileName || adv.aadhaarBackFileName || 'Aadhaar Card (Back Side)';
+      const aadhaarLegacyPath = cand.aadhaarUrl || cand.aadhaarFile || adv.aadhaarUrl || adv.aadhaarFile;
+      const aadhaarLegacyName = cand.aadhaarFileName || adv.aadhaarFileName || 'Aadhaar Card (Front Side)';
+
+      if (aadhaarFrontPath) {
+        map['Aadhaar Card (Front Side)'] = {
+          name: aadhaarFrontName,
+          fileName: aadhaarFrontName,
+          url: aadhaarFrontPath,
+          path: aadhaarFrontPath,
+          verificationStatus: 'PENDING'
+        };
+      } else if (aadhaarLegacyPath) {
+        map['Aadhaar Card (Front Side)'] = {
+          name: aadhaarLegacyName,
+          fileName: aadhaarLegacyName,
+          url: aadhaarLegacyPath,
+          path: aadhaarLegacyPath,
           verificationStatus: 'PENDING'
         };
       }
-      if (candidate.panUrl) {
+
+      if (aadhaarBackPath) {
+        map['Aadhaar Card (Back Side)'] = {
+          name: aadhaarBackName,
+          fileName: aadhaarBackName,
+          url: aadhaarBackPath,
+          path: aadhaarBackPath,
+          verificationStatus: 'PENDING'
+        };
+      }
+
+      const panPath = cand.panUrl || cand.panFile || adv.panUrl || adv.panFile;
+      if (panPath) {
         map['PAN Card copy'] = {
-          name: candidate.panFileName || 'PAN Card copy',
-          fileName: candidate.panFileName || 'PAN Card copy',
-          url: candidate.panUrl,
-          path: candidate.panUrl,
+          name: cand.panFileName || adv.panFileName || 'PAN Card copy',
+          fileName: cand.panFileName || adv.panFileName || 'PAN Card copy',
+          url: panPath,
+          path: panPath,
           verificationStatus: 'PENDING'
         };
       }
-      if (candidate.bankProofUrl) {
+
+      const bankPath = cand.bankProofUrl || cand.bankProofFile || adv.bankProofUrl || adv.bankProofFile;
+      if (bankPath) {
         map['Bank Proof'] = {
-          name: candidate.bankProofFileName || 'Bank Passbook / Cancelled Cheque',
-          fileName: candidate.bankProofFileName || 'Bank Passbook / Cancelled Cheque',
-          url: candidate.bankProofUrl,
-          path: candidate.bankProofUrl,
+          name: cand.bankProofFileName || adv.bankProofFileName || 'Bank Passbook / Cancelled Cheque',
+          fileName: cand.bankProofFileName || adv.bankProofFileName || 'Bank Passbook / Cancelled Cheque',
+          url: bankPath,
+          path: bankPath,
           verificationStatus: 'PENDING'
         };
       }
-      if (candidate.marksheetUrl) {
+
+      const marksheetPath = cand.marksheetUrl || cand.marksheetFile || adv.marksheetUrl || adv.marksheetFile;
+      if (marksheetPath) {
         map['Education Certificate'] = {
-          name: candidate.marksheetFileName || 'Highest Education Certificate / Marksheet',
-          fileName: candidate.marksheetFileName || 'Highest Education Certificate / Marksheet',
-          url: candidate.marksheetUrl,
-          path: candidate.marksheetUrl,
+          name: cand.marksheetFileName || adv.marksheetFileName || 'Highest Education Certificate / Marksheet',
+          fileName: cand.marksheetFileName || adv.marksheetFileName || 'Highest Education Certificate / Marksheet',
+          url: marksheetPath,
+          path: marksheetPath,
           verificationStatus: 'PENDING'
         };
       }
-      if (candidate.signatureUrl) {
+
+      const signaturePath = cand.signatureUrl || cand.signatureFile || adv.signatureUrl || adv.signatureFile;
+      if (signaturePath) {
         map['Signature'] = {
-          name: candidate.signatureFileName || 'Signature Specimen',
-          fileName: candidate.signatureFileName || 'Signature Specimen',
-          url: candidate.signatureUrl,
-          path: candidate.signatureUrl,
+          name: cand.signatureFileName || adv.signatureFileName || 'Signature Specimen',
+          fileName: cand.signatureFileName || adv.signatureFileName || 'Signature Specimen',
+          url: signaturePath,
+          path: signaturePath,
           verificationStatus: 'PENDING'
         };
       }
@@ -902,7 +944,7 @@ export default function AdvisorMilestoneTimeline({
             <p className="text-xs text-slate-400 mt-1">Set the confirmed meeting schedule before completing this milestone.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Meeting date<input type="date" value={stageFormData.meetingDate || ''} onChange={(e) => setStageFormData(prev => ({ ...prev, meetingDate: e.target.value }))} className="mt-1 block w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white outline-none focus:border-blue-500" /></label>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Meeting date<input type="date" min="1900-01-01" max="2099-12-31" value={stageFormData.meetingDate || ''} onChange={(e) => setStageFormData(prev => ({ ...prev, meetingDate: e.target.value }))} className="mt-1 block w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white outline-none focus:border-blue-500" /></label>
             <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Meeting time<input type="time" value={stageFormData.meetingTime || ''} onChange={(e) => setStageFormData(prev => ({ ...prev, meetingTime: e.target.value }))} className="mt-1 block w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white outline-none focus:border-blue-500" /></label>
             <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Meeting venue<input value={stageFormData.meetingVenue || ''} onChange={(e) => setStageFormData(prev => ({ ...prev, meetingVenue: e.target.value }))} placeholder="Office / venue" className="mt-1 block w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-600 outline-none focus:border-blue-500" /></label>
           </div>

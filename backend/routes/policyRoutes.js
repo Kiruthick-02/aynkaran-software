@@ -1,7 +1,9 @@
 // backend/routes/policyRoutes.js
 import express from 'express';
 import { ObjectId } from 'mongodb';
+import fs from 'fs';
 import { uploadCompanyMedia } from '../middleware/uploadMiddleware.js';
+import { uploadBufferToStorage, toPublicHttpsUrl } from '../utils/storageService.js';
 
 function parseJsonArray(value, fallback = []) {
   if (Array.isArray(value)) return value;
@@ -93,7 +95,16 @@ export function policyRoutes(db) {
   router.get('/companies', async (req, res) => {
     try {
       const companies = await collection.find({}).sort({ createdAt: -1 }).toArray();
-      res.json(companies);
+      const shaped = companies.map(c => ({
+        ...c,
+        logo: toPublicHttpsUrl(c.logo),
+        backgroundImage: toPublicHttpsUrl(c.backgroundImage),
+        policies: (c.policies || []).map(p => ({
+          ...p,
+          brochurePath: toPublicHttpsUrl(p.brochurePath)
+        }))
+      }));
+      res.json(shaped);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -147,6 +158,28 @@ export function policyRoutes(db) {
         parseJsonArray(body.descriptionPoints, [])
       );
 
+      let logoUrl = null;
+      if (logoFile) {
+        try {
+          const buffer = fs.readFileSync(logoFile.path);
+          const storageRes = await uploadBufferToStorage(buffer, logoFile.filename, 'companies', logoFile.mimetype);
+          logoUrl = storageRes.publicUrl;
+        } catch (e) {
+          logoUrl = toPublicHttpsUrl(`/uploads/companies/${logoFile.filename}`);
+        }
+      }
+
+      let bgUrl = null;
+      if (bgFile) {
+        try {
+          const buffer = fs.readFileSync(bgFile.path);
+          const storageRes = await uploadBufferToStorage(buffer, bgFile.filename, 'companies', bgFile.mimetype);
+          bgUrl = storageRes.publicUrl;
+        } catch (e) {
+          bgUrl = toPublicHttpsUrl(`/uploads/companies/${bgFile.filename}`);
+        }
+      }
+
       const newCompany = {
         name,
         registrationCode: (body.registrationCode || 'N/A').trim(),
@@ -158,10 +191,8 @@ export function policyRoutes(db) {
         websiteVisibility,
         consultationEnabled: status === 'Active',
         descriptionPoints,
-        logo: logoFile ? `/uploads/companies/${logoFile.filename}` : null,
-        backgroundImage: bgFile
-          ? `/uploads/companies/${bgFile.filename}`
-          : null,
+        logo: logoUrl,
+        backgroundImage: bgUrl,
         stopStartDate:
           status === 'Temporarily Stopped' ? body.stopStartDate || null : null,
         stopEndDate:
@@ -269,9 +300,24 @@ export function policyRoutes(db) {
         );
       }
 
-      if (logoFile) updateData.logo = `/uploads/companies/${logoFile.filename}`;
+      if (logoFile) {
+        try {
+          const buffer = fs.readFileSync(logoFile.path);
+          const storageRes = await uploadBufferToStorage(buffer, logoFile.filename, 'companies', logoFile.mimetype);
+          updateData.logo = storageRes.publicUrl;
+        } catch (e) {
+          updateData.logo = toPublicHttpsUrl(`/uploads/companies/${logoFile.filename}`);
+        }
+      }
+
       if (bgFile) {
-        updateData.backgroundImage = `/uploads/companies/${bgFile.filename}`;
+        try {
+          const buffer = fs.readFileSync(bgFile.path);
+          const storageRes = await uploadBufferToStorage(buffer, bgFile.filename, 'companies', bgFile.mimetype);
+          updateData.backgroundImage = storageRes.publicUrl;
+        } catch (e) {
+          updateData.backgroundImage = toPublicHttpsUrl(`/uploads/companies/${bgFile.filename}`);
+        }
       }
 
       // Fully Active
@@ -301,7 +347,11 @@ export function policyRoutes(db) {
         return res.status(404).json({ error: 'Company not found' });
       }
 
-      res.json(result);
+      res.json({
+        ...result,
+        logo: toPublicHttpsUrl(result.logo),
+        backgroundImage: toPublicHttpsUrl(result.backgroundImage)
+      });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -320,13 +370,13 @@ export function policyRoutes(db) {
         return res.status(400).json({ error: 'Scheme name is required' });
       }
 
+      const brochureRaw = req.body.brochurePath || req.body.filePath || null;
       const newPolicy = {
         id: `pol_${Date.now()}`,
         name,
         keyFeatures: normalizePoints(req.body.keyFeatures),
         eligibilityCriteria: normalizePoints(req.body.eligibilityCriteria),
-        brochurePath:
-          req.body.brochurePath || req.body.filePath || null,
+        brochurePath: brochureRaw ? toPublicHttpsUrl(brochureRaw) : null,
         brochureFileName:
           req.body.brochureFileName || req.body.fileName || null,
         websiteVisibility: req.body.websiteVisibility || 'show',
@@ -383,8 +433,8 @@ export function policyRoutes(db) {
         );
       }
       if (req.body.brochurePath !== undefined || req.body.filePath !== undefined) {
-        setFields['policies.$.brochurePath'] =
-          req.body.brochurePath || req.body.filePath || null;
+        const raw = req.body.brochurePath || req.body.filePath || null;
+        setFields['policies.$.brochurePath'] = raw ? toPublicHttpsUrl(raw) : null;
       }
       if (
         req.body.brochureFileName !== undefined ||
@@ -404,13 +454,13 @@ export function policyRoutes(db) {
         return res.status(404).json({ error: 'Company or scheme not found' });
       }
 
+      const updatedBrochure = req.body.brochurePath || req.body.filePath;
       res.json({
         id: policyId,
         name: req.body.name,
         keyFeatures: normalizePoints(req.body.keyFeatures),
         eligibilityCriteria: normalizePoints(req.body.eligibilityCriteria),
-        brochurePath:
-          req.body.brochurePath || req.body.filePath || null,
+        brochurePath: updatedBrochure ? toPublicHttpsUrl(updatedBrochure) : null,
         brochureFileName:
           req.body.brochureFileName || req.body.fileName || null,
         websiteVisibility: req.body.websiteVisibility,
@@ -441,7 +491,7 @@ export function policyRoutes(db) {
     }
   });
 
-  // ==================== PUBLIC CATALOG ====================
+  // ==================== PUBLIC CATALOG (GET /api/public/catalog) ====================
   router.get('/public/catalog', async (req, res) => {
     try {
       const companies = await collection
@@ -467,8 +517,8 @@ export function policyRoutes(db) {
           descriptionPoints: Array.isArray(c.descriptionPoints)
             ? c.descriptionPoints
             : [],
-          logo: c.logo || null,
-          backgroundImage: c.backgroundImage || null,
+          logo: toPublicHttpsUrl(c.logo),
+          backgroundImage: toPublicHttpsUrl(c.backgroundImage),
           categories: c.insuranceTypes?.length
             ? c.insuranceTypes.map((t) =>
                 String(t).replace(/ Insurance$/i, '')
@@ -513,8 +563,8 @@ export function policyRoutes(db) {
               partnerId: c._id.toString(),
               partnerName: c.name,
               consultationEnabled: isFullyActive,
-              logo: c.logo || null,
-              brochurePath: p.brochurePath || null,
+              logo: toPublicHttpsUrl(c.logo),
+              brochurePath: toPublicHttpsUrl(p.brochurePath),
               brochureFileName: p.brochureFileName || null,
             });
           });

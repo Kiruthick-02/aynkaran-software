@@ -334,7 +334,8 @@ export default function Customers({
       setSelectedEnquiry(initialEnquiry);
     }
   }, [initialEnquiry]);
-  const [editAadhaarFile, setEditAadhaarFile] = useState(null);
+  const [editAadhaarFrontFile, setEditAadhaarFrontFile] = useState(null);
+  const [editAadhaarBackFile, setEditAadhaarBackFile] = useState(null);
   const [editPhotoFile, setEditPhotoFile] = useState(null);
   const [editPanFile, setEditPanFile] = useState(null);
   const [editMarksheetFile, setEditMarksheetFile] = useState(null);
@@ -343,6 +344,8 @@ export default function Customers({
   const [editIncomeProofFile, setEditIncomeProofFile] = useState(null);
 
  const [clearedDocs, setClearedDocs] = useState({
+  aadhaarFront: false,
+  aadhaarBack: false,
   aadhaar: false,
   photo: false,
   pan: false,
@@ -543,7 +546,11 @@ export default function Customers({
   }
 
   const pairs = [
-    ['Aadhaar', c.aadhaarUrl || c.aadhaarFile, c.aadhaarFileName],
+    ['Aadhaar (Front Side)', c.aadhaarFrontUrl || c.aadhaarFrontFile, c.aadhaarFrontFileName],
+    ['Aadhaar (Back Side)', c.aadhaarBackUrl || c.aadhaarBackFile, c.aadhaarBackFileName],
+    ...(!c.aadhaarFrontUrl && !c.aadhaarFrontFile && (c.aadhaarUrl || c.aadhaarFile)
+      ? [['Aadhaar Card', c.aadhaarUrl || c.aadhaarFile, c.aadhaarFileName]]
+      : []),
     ['PAN', c.panUrl || c.panFile, c.panFileName],
     ['Photo', c.photoUrl || c.profilePhoto || c.passportPhoto, c.photoFileName],
     ['Marksheet', c.marksheetUrl || c.marksheetFile, c.marksheetFileName],
@@ -723,7 +730,8 @@ export default function Customers({
   };
 
   const [
-    aadhaarUp,
+    aadhaarFrontUp,
+    aadhaarBackUp,
     photoUp,
     panUp,
     marksheetUp,
@@ -731,7 +739,8 @@ export default function Customers({
     signatureUp,
     incomeUp,
   ] = await Promise.all([
-    uploadOne(editAadhaarFile, 'aadhaar'),
+    uploadOne(editAadhaarFrontFile, 'aadhaarFront'),
+    uploadOne(editAadhaarBackFile, 'aadhaarBack'),
     uploadOne(editPhotoFile, 'photo'),
     uploadOne(editPanFile, 'pan'),
     uploadOne(editMarksheetFile, 'marksheet'),
@@ -758,12 +767,20 @@ export default function Customers({
   };
 
   applyDoc(
-    aadhaarUp,
-    clearedDocs.aadhaar,
-    selectedCustomer?.aadhaarUrl || selectedCustomer?.aadhaarFile,
-    selectedCustomer?.aadhaarFileName,
-    'aadhaarUrl',
-    'aadhaarFileName'
+    aadhaarFrontUp,
+    clearedDocs.aadhaarFront || clearedDocs.aadhaar,
+    selectedCustomer?.aadhaarFrontUrl || selectedCustomer?.aadhaarFrontFile || selectedCustomer?.aadhaarUrl || selectedCustomer?.aadhaarFile,
+    selectedCustomer?.aadhaarFrontFileName || selectedCustomer?.aadhaarFileName,
+    'aadhaarFrontUrl',
+    'aadhaarFrontFileName'
+  );
+  applyDoc(
+    aadhaarBackUp,
+    clearedDocs.aadhaarBack,
+    selectedCustomer?.aadhaarBackUrl || selectedCustomer?.aadhaarBackFile,
+    selectedCustomer?.aadhaarBackFileName,
+    'aadhaarBackUrl',
+    'aadhaarBackFileName'
   );
   applyDoc(
     photoUp,
@@ -829,6 +846,8 @@ export default function Customers({
     type="button"
     onClick={() => {
       setClearedDocs({
+        aadhaarFront: false,
+        aadhaarBack: false,
         aadhaar: false,
         photo: false,
         pan: false,
@@ -837,7 +856,8 @@ export default function Customers({
         signature: false,
         incomeProof: false,
       });
-      setEditAadhaarFile(null);
+      setEditAadhaarFrontFile(null);
+      setEditAadhaarBackFile(null);
       setEditPhotoFile(null);
       setEditPanFile(null);
       setEditMarksheetFile(null);
@@ -1324,6 +1344,8 @@ export default function Customers({
                     <div className="flex flex-col sm:flex-row gap-2">
                       <input
                         type="date"
+                        min="1900-01-01"
+                        max="2099-12-31"
                         value={renewalDraft}
                         onChange={(e) => setRenewalDraft(e.target.value)}
                         onClick={(e) => {
@@ -1377,6 +1399,8 @@ export default function Customers({
                           </label>
                           <input
                             type={f.type || 'text'}
+                            min={f.type === 'date' ? '1900-01-01' : undefined}
+                            max={f.type === 'date' ? '2099-12-31' : undefined}
                             value={editForm[f.key] || ''}
                             onChange={(e) =>
                               setEditForm((prev) => ({
@@ -1428,6 +1452,8 @@ export default function Customers({
                           </label>
                           <input
                             type={f.type || 'text'}
+                            min={f.type === 'date' ? '1900-01-01' : undefined}
+                            max={f.type === 'date' ? '2099-12-31' : undefined}
                             value={editNominee[f.key] || ''}
                             onChange={(e) =>
                               setEditNominee((prev) => ({
@@ -1453,13 +1479,22 @@ export default function Customers({
   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
     {[
       {
-        label: 'Aadhaar',
-        file: editAadhaarFile,
-        setFile: setEditAadhaarFile,
-        key: 'aadhaar',
-        pathKeys: ['aadhaarUrl', 'aadhaarFile'],
-        nameKeys: ['aadhaarFileName'],
-        match: ['aadhaar'],
+        label: 'Aadhaar (Front Side)',
+        file: editAadhaarFrontFile,
+        setFile: setEditAadhaarFrontFile,
+        key: 'aadhaarFront',
+        pathKeys: ['aadhaarFrontUrl', 'aadhaarFrontFile', 'aadhaarUrl', 'aadhaarFile'],
+        nameKeys: ['aadhaarFrontFileName', 'aadhaarFileName'],
+        match: ['aadhaarfront', 'aadhaar_front', 'front', 'aadhaar'],
+      },
+      {
+        label: 'Aadhaar (Back Side)',
+        file: editAadhaarBackFile,
+        setFile: setEditAadhaarBackFile,
+        key: 'aadhaarBack',
+        pathKeys: ['aadhaarBackUrl', 'aadhaarBackFile'],
+        nameKeys: ['aadhaarBackFileName'],
+        match: ['aadhaarback', 'aadhaar_back', 'back'],
       },
       {
         label: 'Photo',

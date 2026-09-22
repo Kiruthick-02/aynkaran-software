@@ -20,6 +20,8 @@ export class Customer {
         type: Object,
         default: {
           passportSizePhoto: undefined,
+          aadhaarFront: undefined,
+          aadhaarBack: undefined,
           aadhaarCard: undefined,
           panCard: undefined,
           incomeProof: undefined,

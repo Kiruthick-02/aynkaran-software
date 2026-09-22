@@ -61,11 +61,25 @@ function extractDocs(source, sourceType) {
   };
 
   push(
-    'Aadhaar Card copy',
-    source.aadhaarUrl || source.aadhaarFile || source.aadhaarDocUrl,
-    source.aadhaarFileName,
-    'Aadhaar'
+    'Aadhaar Card (Front Side)',
+    source.aadhaarFrontUrl || source.aadhaarFrontFile || source.aadhaarFrontDocUrl,
+    source.aadhaarFrontFileName,
+    'Aadhaar Front'
   );
+  push(
+    'Aadhaar Card (Back Side)',
+    source.aadhaarBackUrl || source.aadhaarBackFile || source.aadhaarBackDocUrl,
+    source.aadhaarBackFileName,
+    'Aadhaar Back'
+  );
+  if (!source.aadhaarFrontUrl && !source.aadhaarFrontFile && !source.aadhaarFrontDocUrl && (source.aadhaarUrl || source.aadhaarFile || source.aadhaarDocUrl)) {
+    push(
+      'Aadhaar Card copy',
+      source.aadhaarUrl || source.aadhaarFile || source.aadhaarDocUrl,
+      source.aadhaarFileName,
+      'Aadhaar'
+    );
+  }
   push(
     'PAN Card copy',
     source.panUrl || source.panFile || source.panDoc,
@@ -144,6 +158,8 @@ function extractDocs(source, sourceType) {
 
 /** Map category label → field name(s) to clear on the source record */
 const CATEGORY_TO_FIELDS = {
+  'Aadhaar Card (Front Side)': ['aadhaarFrontUrl', 'aadhaarFrontFile', 'aadhaarFrontDocUrl', 'aadhaarUrl', 'aadhaarFile'],
+  'Aadhaar Card (Back Side)': ['aadhaarBackUrl', 'aadhaarBackFile', 'aadhaarBackDocUrl'],
   'Aadhaar Card copy': ['aadhaarUrl', 'aadhaarFile', 'aadhaarDocUrl'],
   'PAN Card copy': ['panUrl', 'panFile', 'panDoc'],
   'Passport Size Photo': ['photoUrl', 'profilePhoto', 'passportPhoto', 'passportPhotoUrl', 'profilePicture'],
@@ -581,7 +597,9 @@ export default function Documents({
           {userRole !== 'Staff' && <option value="Candidate">Candidate Training Documents Only</option>}
           {userRole !== 'Staff' && <option value="Advisor">Advisor Licensing Documents Only</option>}
           <option value="Passport">Passport-Size Photos</option>
-          <option value="Aadhaar">Aadhaar Card copies</option>
+          <option value="Aadhaar Front">Aadhaar Card (Front Side)</option>
+          <option value="Aadhaar Back">Aadhaar Card (Back Side)</option>
+          <option value="Aadhaar">Aadhaar Card (All copies)</option>
           <option value="PAN">PAN Card copies</option>
           <option value="Education">Education Certificates / Marksheets</option>
           <option value="Bank">Bank Passbook / Proof</option>

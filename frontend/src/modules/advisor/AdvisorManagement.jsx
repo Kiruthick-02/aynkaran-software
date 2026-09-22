@@ -8,7 +8,7 @@ import {
   RotateCcw, CheckCircle2, ChevronDown, ChevronUp, Edit3, Camera, Upload, Inbox, Trash2
 } from 'lucide-react';
 import { advisorApi } from '../../services/advisorApi';
-import API_URL from '../../config/api';
+import API_URL, { resolveApiUrl } from '../../config/api';
 import AdvisorProfile from './AdvisorProfile';
 import CandidateConversionModal from './CandidateConversionModal';
 import DocumentPreviewModal from './DocumentPreviewModal';
@@ -323,8 +323,14 @@ export default function AdvisorManagement({
         updatedFields.photoUrl = docUrl;
         updatedFields.profilePicture = docUrl;
         updatedFields.passportPhoto = docUrl;
-      } else if (docCat.includes('aadhaar')) {
-        updatedFields.aadhaarUrl = docUrl;
+      } else if (docCat.includes('aadhaar') || docCat.includes('aadhar')) {
+        if (docCat.includes('front')) {
+          updatedFields.aadhaarFrontUrl = docUrl;
+        } else if (docCat.includes('back')) {
+          updatedFields.aadhaarBackUrl = docUrl;
+        } else {
+          updatedFields.aadhaarUrl = docUrl;
+        }
       } else if (docCat.includes('pan')) {
         updatedFields.panUrl = docUrl;
       } else if (docCat.includes('bank') || docCat.includes('passbook') || docCat.includes('cheque')) {
@@ -618,9 +624,38 @@ export default function AdvisorManagement({
                       <tr key={a.id} className="hover:bg-slate-800/40 transition">
                         <td className="p-4 font-mono text-blue-400 font-black">{a.advisorCode}</td>
                         <td className="p-4">
-                          <div>
-                            <span className="text-white font-bold">{a.fullName}</span>
-                            <p className="text-[10px] text-slate-500 font-mono">Lic: {a.licenseNumber}</p>
+                          <div className="flex items-center gap-3">
+                            {(() => {
+                              const photoPath = a.photoUrl || a.profilePicture || a.passportPhoto || (a.documents || []).find(d => {
+                                const cat = (d.category || d.name || '').toLowerCase();
+                                return cat.includes('photo') || cat.includes('passport') || cat.includes('profile');
+                              })?.url || null;
+                              const thumbUrl = photoPath ? resolveApiUrl(photoPath) : null;
+                              const initials = (a.fullName || 'AD').split(/\s+/).map(p => p[0]).join('').slice(0, 2).toUpperCase();
+
+                              return (
+                                <>
+                                  {thumbUrl ? (
+                                    <img
+                                      src={thumbUrl}
+                                      alt={a.fullName}
+                                      className="w-9 h-9 rounded-xl object-cover border border-slate-700 bg-slate-800 shrink-0"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                        if (e.currentTarget.nextElementSibling) e.currentTarget.nextElementSibling.style.display = 'flex';
+                                      }}
+                                    />
+                                  ) : null}
+                                  <div className={`w-9 h-9 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400 flex items-center justify-center text-xs font-black shrink-0 ${thumbUrl ? 'hidden' : ''}`}>
+                                    {initials}
+                                  </div>
+                                </>
+                              );
+                            })()}
+                            <div>
+                              <span className="text-white font-bold">{a.fullName}</span>
+                              <p className="text-[10px] text-slate-500 font-mono">Lic: {a.licenseNumber}</p>
+                            </div>
                           </div>
                         </td>
                         <td className="p-4 font-mono text-slate-400">{a.mobile}</td>

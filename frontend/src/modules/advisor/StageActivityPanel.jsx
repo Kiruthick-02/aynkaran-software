@@ -14,7 +14,16 @@ function StageField({ label, field, type = 'text', options, formData, onChange, 
 					<option value="">Select</option>{options.map(option => <option key={option} value={option}>{option}</option>)}
 				</select>
 			) : (
-				<input type={type} value={formData[field] || ''} readOnly={readOnly} required={required} onChange={(e) => onChange?.(field, e.target.value)} className={`mt-1 w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500 ${readOnly ? 'cursor-not-allowed opacity-70' : ''}`} />
+				<input
+					type={type}
+					min={type === 'date' ? '1900-01-01' : undefined}
+					max={type === 'date' ? '2099-12-31' : undefined}
+					value={formData[field] || ''}
+					readOnly={readOnly}
+					required={required}
+					onChange={(e) => onChange?.(field, e.target.value)}
+					className={`mt-1 w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500 ${readOnly ? 'cursor-not-allowed opacity-70' : ''}`}
+				/>
 			)}
 		</label>
 	);

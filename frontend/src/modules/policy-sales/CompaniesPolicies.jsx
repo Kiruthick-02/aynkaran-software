@@ -486,7 +486,8 @@ const [editPolicyBrochureCleared, setEditPolicyBrochureCleared] = useState(false
 const [incomeProofFile, setIncomeProofFile] = useState(null);
 const [incomeProofFileName, setIncomeProofFileName] = useState('');
   const [annualIncome, setAnnualIncome] = useState('');
-  const [aadhaarFileName, setAadhaarFileName] = useState('');
+  const [aadhaarFrontFileName, setAadhaarFrontFileName] = useState('');
+  const [aadhaarBackFileName, setAadhaarBackFileName] = useState('');
   const [photoFileName, setPhotoFileName] = useState('');
   const [panFileName, setPanFileName] = useState('');
   const [marksheetFileName, setMarksheetFileName] = useState('');
@@ -496,7 +497,8 @@ const [incomeProofFileName, setIncomeProofFileName] = useState('');
 const [custMobile2, setCustMobile2] = useState('');
 const [nomineeMobile, setNomineeMobile] = useState('');
 const [nomineeMobile2, setNomineeMobile2] = useState('');
-const [aadhaarFile, setAadhaarFile] = useState(null);
+const [aadhaarFrontFile, setAadhaarFrontFile] = useState(null);
+const [aadhaarBackFile, setAadhaarBackFile] = useState(null);
 const [photoFile, setPhotoFile] = useState(null);
 const [panFile, setPanFile] = useState(null);
 const [marksheetFile, setMarksheetFile] = useState(null);
@@ -554,6 +556,8 @@ const isValidSecureEmail = (email) => {
 
 // Existing saved documents (edit mode) — show name, don't force re-upload
 const [existingDocs, setExistingDocs] = useState({
+  aadhaarFront: null,
+  aadhaarBack: null,
   aadhaar: null,      // { path, fileName }
   photo: null,
   pan: null,
@@ -565,6 +569,8 @@ const [existingDocs, setExistingDocs] = useState({
 
 const clearExistingDocs = () => {
   setExistingDocs({
+    aadhaarFront: null,
+    aadhaarBack: null,
     aadhaar: null,
     photo: null,
     pan: null,
@@ -1373,7 +1379,8 @@ const handleDeletePolicy = async (policyId, policyName) => {
   }
 
   [
-    checkDocFile(aadhaarFile, 'Aadhaar'),
+    checkDocFile(aadhaarFrontFile, 'Aadhaar front'),
+    checkDocFile(aadhaarBackFile, 'Aadhaar back'),
     checkDocFile(photoFile, 'Photo'),
     checkDocFile(panFile, 'PAN'),
     checkDocFile(marksheetFile, 'Marksheet'),
@@ -1427,7 +1434,8 @@ const handleDeletePolicy = async (policyId, policyName) => {
   };
 
   const [
-    aadhaarUp,
+    aadhaarFrontUp,
+    aadhaarBackUp,
     photoUp,
     panUp,
     marksheetUp,
@@ -1435,7 +1443,8 @@ const handleDeletePolicy = async (policyId, policyName) => {
     signatureUp,
     incomeUp,
   ] = await Promise.all([
-    uploadCustomerDoc(aadhaarFile, 'aadhaar'),
+    uploadCustomerDoc(aadhaarFrontFile, 'aadhaarFront'),
+    uploadCustomerDoc(aadhaarBackFile, 'aadhaarBack'),
     uploadCustomerDoc(photoFile, 'photo'),
     uploadCustomerDoc(panFile, 'pan'),
     uploadCustomerDoc(marksheetFile, 'marksheet'),
@@ -1503,7 +1512,8 @@ const handleDeletePolicy = async (policyId, policyName) => {
     }
   };
 
-  applyDoc(aadhaarUp, existingDocs.aadhaar, 'aadhaarUrl', 'aadhaarFileName');
+  applyDoc(aadhaarFrontUp, existingDocs.aadhaarFront || existingDocs.aadhaar, 'aadhaarFrontUrl', 'aadhaarFrontFileName');
+  applyDoc(aadhaarBackUp, existingDocs.aadhaarBack, 'aadhaarBackUrl', 'aadhaarBackFileName');
   applyDoc(photoUp, existingDocs.photo, 'photoUrl', 'photoFileName');
   applyDoc(panUp, existingDocs.pan, 'panUrl', 'panFileName');
   applyDoc(marksheetUp, existingDocs.marksheet, 'marksheetUrl', 'marksheetFileName');
@@ -1548,14 +1558,16 @@ const handleDeletePolicy = async (policyId, policyName) => {
   setNomineeMobile2('');
   setNomineeEmail('');
   setAnnualIncome('');
-  setAadhaarFileName('');
+  setAadhaarFrontFileName('');
+  setAadhaarBackFileName('');
   setPhotoFileName('');
   setPanFileName('');
   setMarksheetFileName('');
   setBankProofFileName('');
   setSignatureFileName('');
   setIncomeProofFileName('');
-  setAadhaarFile(null);
+  setAadhaarFrontFile(null);
+  setAadhaarBackFile(null);
   setPhotoFile(null);
   setPanFile(null);
   setMarksheetFile(null);
@@ -1628,6 +1640,14 @@ const handleDeletePolicy = async (policyId, policyName) => {
       : null;
 
   setExistingDocs({
+    aadhaarFront: pick(
+      cust.aadhaarFrontUrl || cust.aadhaarFrontFile || cust.aadhaarUrl || cust.aadhaarFile,
+      cust.aadhaarFrontFileName || cust.aadhaarFileName
+    ),
+    aadhaarBack: pick(
+      cust.aadhaarBackUrl || cust.aadhaarBackFile,
+      cust.aadhaarBackFileName
+    ),
     aadhaar: pick(
       cust.aadhaarUrl || cust.aadhaarFile,
       cust.aadhaarFileName
@@ -1656,8 +1676,10 @@ const handleDeletePolicy = async (policyId, policyName) => {
   });
 
   // Clear any newly picked files
-  setAadhaarFile(null);
-  setAadhaarFileName('');
+  setAadhaarFrontFile(null);
+  setAadhaarFrontFileName('');
+  setAadhaarBackFile(null);
+  setAadhaarBackFileName('');
   setPhotoFile(null);
   setPhotoFileName('');
   setPanFile(null);
@@ -2352,6 +2374,8 @@ const handleDeletePolicy = async (policyId, policyName) => {
               <input
                 required
                 type="date"
+                min="1900-01-01"
+                max="2099-12-31"
                 value={custDob}
                 onChange={(e) => setCustDob(e.target.value)}
                 onClick={(e) => {
@@ -2449,6 +2473,8 @@ const handleDeletePolicy = async (policyId, policyName) => {
       <input
         required
         type="date"
+        min="1900-01-01"
+        max="2099-12-31"
         value={nomineeDob}
         onChange={(e) => setNomineeDob(e.target.value)}
         onClick={(e) => {
@@ -2569,13 +2595,24 @@ const handleDeletePolicy = async (policyId, policyName) => {
 
   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
     <DocUploadZone
-      label="Aadhaar Card Copy (max 1 MB)"
-      hint="Drag Aadhaar copy here"
-      file={aadhaarFile}
-      setFile={setAadhaarFile}
-      existing={existingDocs.aadhaar}
+      label="Aadhaar Card (Front Side) (max 1 MB)"
+      hint="Drag Aadhaar front copy here"
+      file={aadhaarFrontFile}
+      setFile={setAadhaarFrontFile}
+      existing={existingDocs.aadhaarFront}
       onClearExisting={() =>
-        setExistingDocs((prev) => ({ ...prev, aadhaar: null }))
+        setExistingDocs((prev) => ({ ...prev, aadhaarFront: null, aadhaar: null }))
+      }
+      apiUrl={API_URL}
+    />
+    <DocUploadZone
+      label="Aadhaar Card (Back Side) (max 1 MB)"
+      hint="Drag Aadhaar back copy here"
+      file={aadhaarBackFile}
+      setFile={setAadhaarBackFile}
+      existing={existingDocs.aadhaarBack}
+      onClearExisting={() =>
+        setExistingDocs((prev) => ({ ...prev, aadhaarBack: null }))
       }
       apiUrl={API_URL}
     />
@@ -3125,6 +3162,8 @@ const handleDeletePolicy = async (policyId, policyName) => {
     <input
       required
       type="date"
+      min="1900-01-01"
+      max="2099-12-31"
       value={stopStartDateVal || ''}
       onChange={(e) => setStopStartDateVal(e.target.value)}
       onClick={(e) => {
@@ -3142,6 +3181,8 @@ const handleDeletePolicy = async (policyId, policyName) => {
     <input
       required
       type="date"
+      min="1900-01-01"
+      max="2099-12-31"
       value={stopEndDateVal || ''}
       onChange={(e) => setStopEndDateVal(e.target.value)}
       onClick={(e) => {

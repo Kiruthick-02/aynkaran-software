@@ -226,6 +226,8 @@ export default function CandidateConversionModal({
                 </label>
                 <input
                   type="date"
+                  min="1900-01-01"
+                  max="2099-12-31"
                   value={issueDate}
                   onChange={e => setIssueDate(e.target.value)}
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs focus:outline-none focus:border-blue-500 cursor-pointer"
