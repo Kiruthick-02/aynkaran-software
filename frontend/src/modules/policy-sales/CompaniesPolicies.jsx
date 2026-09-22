@@ -2838,7 +2838,7 @@ const handleDeletePolicy = async (policyId, policyName) => {
               inputMode="numeric"
               value={newCompanyContact}
               onChange={(e) =>
-                setNewCompanyContact(e.target.value.replace(/\D/g, '').slice(0, 15))
+                setNewCompanyContact(e.target.value.replace(/\D/g, '').slice(0, 10))
               }
               placeholder="+91"
               className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-white outline-none focus:border-blue-500"
