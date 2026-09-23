@@ -43,39 +43,73 @@ export class WhatsAppService {
     const formattedMessage = this.interpolateVariables(message, variables);
 
     // Provider Gateway Configuration from environment or options
-    const apiUrl = providerConfig?.apiUrl || process.env.WHATSAPP_API_URL;
-    const apiKey = providerConfig?.apiKey || process.env.WHATSAPP_API_KEY;
+    const apiUrl = providerConfig?.apiUrl || process.env.WHATSAPP_SENDER_API_URL || process.env.WHATSAPP_API_URL;
+    const httpMethod = (providerConfig?.method || process.env.WHATSAPP_SENDER_METHOD || process.env.WHATSAPP_METHOD || 'POST').toUpperCase();
+    const phoneParam = providerConfig?.phoneParam || process.env.WHATSAPP_SENDER_PHONE_PARAM || 'phone';
+    const msgParam = providerConfig?.messageParam || process.env.WHATSAPP_SENDER_MESSAGE_PARAM || 'message';
+    const authParam = providerConfig?.authParam || process.env.WHATSAPP_SENDER_AUTH_PARAM || 'apikey';
+    const authVal = providerConfig?.apiKey || process.env.WHATSAPP_SENDER_AUTH_VAL || process.env.WHATSAPP_API_KEY || '';
     const senderNumber = providerConfig?.senderNumber || process.env.WHATSAPP_SENDER_NUMBER;
-    const httpMethod = (providerConfig?.method || process.env.WHATSAPP_METHOD || 'POST').toUpperCase();
 
-    // 1. Live Gateway Dispatch if WHATSAPP_API_URL is configured
-    if (apiUrl && apiKey) {
+    // 1. Live Gateway Dispatch if apiUrl is configured
+    if (apiUrl) {
       try {
-        console.log(`[WhatsApp Gateway] Dispatching to ${targetMobile} via ${apiUrl}...`);
+        console.log(`[WhatsApp Gateway] Dispatching to ${targetMobile} via ${apiUrl} [Method: ${httpMethod}]...`);
 
-        const headers = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          ...(providerConfig?.headers || {})
-        };
+        let response;
+        if (httpMethod === 'GET') {
+          const urlObj = new URL(apiUrl, apiUrl.startsWith('http') ? undefined : 'http://localhost');
+          urlObj.searchParams.set(phoneParam, targetMobile);
+          urlObj.searchParams.set(msgParam, formattedMessage);
+          if (authVal && authParam) {
+            urlObj.searchParams.set(authParam, authVal);
+          }
+          if (senderNumber) {
+            urlObj.searchParams.set('from', senderNumber);
+          }
+          if (mediaUrl) {
+            urlObj.searchParams.set('media_url', mediaUrl);
+          }
 
-        const payload = {
-          recipient: targetMobile,
-          from: senderNumber,
-          type: mediaUrl ? 'media' : 'text',
-          templateId,
-          message: formattedMessage,
-          mediaUrl,
-          parameters: variables
-        };
+          response = await fetch(urlObj.toString(), {
+            method: 'GET',
+            headers: {
+              ...(authVal && authParam === 'Authorization' ? { Authorization: `Bearer ${authVal}` } : {}),
+              ...(providerConfig?.headers || {})
+            }
+          });
+        } else {
+          // POST / PUT dispatch
+          const headers = {
+            'Content-Type': 'application/json',
+            ...(authVal && authParam === 'Authorization' ? { Authorization: `Bearer ${authVal}` } : {}),
+            ...(providerConfig?.headers || {})
+          };
 
-        const response = await fetch(apiUrl, {
-          method: httpMethod,
-          headers,
-          body: JSON.stringify(payload)
-        });
+          const payload = {
+            [phoneParam]: targetMobile,
+            [msgParam]: formattedMessage,
+            ...(authVal && authParam && authParam !== 'Authorization' ? { [authParam]: authVal } : {}),
+            ...(senderNumber ? { from: senderNumber } : {}),
+            ...(mediaUrl ? { mediaUrl, type: 'media' } : { type: 'text' }),
+            ...(templateId ? { templateId } : {}),
+            parameters: variables
+          };
 
-        const responseData = await response.json().catch(() => ({ status: response.status }));
+          response = await fetch(apiUrl, {
+            method: httpMethod,
+            headers,
+            body: JSON.stringify(payload)
+          });
+        }
+
+        const responseText = await response.text();
+        let responseData;
+        try {
+          responseData = JSON.parse(responseText);
+        } catch (_) {
+          responseData = { rawResponse: responseText, status: response.status };
+        }
 
         if (!response.ok) {
           throw new Error(`WhatsApp Gateway Error (${response.status}): ${JSON.stringify(responseData)}`);
@@ -83,11 +117,12 @@ export class WhatsAppService {
 
         return {
           success: true,
-          providerMessageId: responseData.messageId || responseData.id || `wa-${Date.now()}`,
+          providerMessageId: responseData.messageId || responseData.id || responseData.msgId || `wa-${Date.now()}`,
           provider: 'Live WhatsApp API Gateway',
           status: 'SENT',
           messageBody: formattedMessage,
-          deliveredAt: new Date().toISOString()
+          deliveredAt: new Date().toISOString(),
+          details: responseData
         };
       } catch (err) {
         console.error('[WhatsApp Gateway Failure]', err.message);

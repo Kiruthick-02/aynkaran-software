@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 
 import { setupDatabase } from './config/db.js';
 import { createExpressApp } from './app.js';
+import { initStorage } from './utils/storageService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,6 +23,7 @@ async function run() {
 
     // Database connection
     const db = await setupDatabase();
+    initStorage(db);
 
     console.log('[System] MongoDB connected successfully');
 

@@ -92,6 +92,40 @@ function shapeAnnouncement(doc) {
   };
 }
 
+function shapeCompany(doc) {
+  return {
+    id: doc.id || doc._id?.toString(),
+    companyName: doc.companyName || '',
+    companyProfileImage: doc.companyProfileImage || null,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+  };
+}
+
+function shapeProcedure(doc) {
+  return {
+    id: doc.id || doc._id?.toString(),
+    companyId: doc.companyId ? doc.companyId.toString() : null,
+    text: doc.text || '',
+    order: typeof doc.order === 'number' ? doc.order : 0,
+    createdAt: doc.createdAt,
+  };
+}
+
+function shapeHelpline(doc) {
+  return {
+    id: doc.id || doc._id?.toString(),
+    companyId: doc.companyId ? doc.companyId.toString() : null,
+    number: doc.number || '',
+    order: typeof doc.order === 'number' ? doc.order : 0,
+    createdAt: doc.createdAt,
+  };
+}
+
+function validHelpline(number) {
+  return /^\d{10}$/.test(String(number || '').trim());
+}
+
 export function contentRoutes(db) {
   const router = express.Router();
   const postersCol = db.collection('content_posters');
@@ -99,6 +133,56 @@ export function contentRoutes(db) {
   const galleryCol = db.collection('content_gallery');
   const announcementsCol = db.collection('content_announcements');
   const categoriesCol = db.collection('content_categories');
+  const claimHelpCol = db.collection('content_claimhelp');
+  const proceduresCol = db.collection('content_claimhelp_procedures');
+  const helplinesCol = db.collection('content_claimhelp_helplines');
+
+  // Build a single company's full view (image + name + ordered procedures + helplines)
+  async function shapeCompanyFull(id) {
+    const filter = ObjectId.isValid(id) ? { _id: new ObjectId(id) } : { _id: id };
+    const config = await claimHelpCol.findOne(filter);
+    if (!config) return null;
+    const cid = config._id.toString();
+    const [procDocs, helpDocs] = await Promise.all([
+      proceduresCol.find({ companyId: config._id }).sort({ order: 1 }).toArray(),
+      helplinesCol.find({ companyId: config._id }).sort({ order: 1 }).toArray(),
+    ]);
+    return {
+      ...shapeCompany(config),
+      procedures: procDocs.map(shapeProcedure),
+      helplineNumbers: helpDocs.map(shapeHelpline),
+    };
+  }
+
+  // Build every company with their procedures + helplines (used by the aggregate + list endpoint)
+  async function shapeClaimHelp() {
+    const [companyDocs, procDocs, helpDocs] = await Promise.all([
+      claimHelpCol.find({}).sort({ createdAt: -1 }).toArray(),
+      proceduresCol.find({}).sort({ order: 1 }).toArray(),
+      helplinesCol.find({}).sort({ order: 1 }).toArray(),
+    ]);
+    const proceduresByCompany = {};
+    const helplinesByCompany = {};
+    procDocs.forEach((p) => {
+      const cid = p.companyId ? p.companyId.toString() : '';
+      if (!proceduresByCompany[cid]) proceduresByCompany[cid] = [];
+      proceduresByCompany[cid].push(shapeProcedure(p));
+    });
+    helpDocs.forEach((h) => {
+      const cid = h.companyId ? h.companyId.toString() : '';
+      if (!helplinesByCompany[cid]) helplinesByCompany[cid] = [];
+      helplinesByCompany[cid].push(shapeHelpline(h));
+    });
+    const companies = companyDocs.map((c) => {
+      const cid = c._id.toString();
+      return {
+        ...shapeCompany(c),
+        procedures: proceduresByCompany[cid] || [],
+        helplineNumbers: helplinesByCompany[cid] || [],
+      };
+    });
+    return { companies };
+  }
 
   // ---------- ALL CONTENT ----------
   // ---------- ALL CONTENT (GET /api/content) ----------
@@ -156,6 +240,7 @@ export function contentRoutes(db) {
         gallery: gallery.map(shapeGallery),
         announcements: { customers: annCustomers, advisors: annAdvisors },
         categories: { news: newsCats, gallery: galCats },
+        claimHelp: await shapeClaimHelp(),
       });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -470,6 +555,306 @@ export function contentRoutes(db) {
         }
       }
       await galleryCol.deleteOne(filter);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ---------- CLAIM HELP (multi-company) ----------
+  // All companies, each with its profile image + name + ordered procedures + helplines.
+  // This is surfaced on the aggregate `GET /api/content` as `claimHelp`.
+  router.get('/claimhelp', async (_req, res) => {
+    try {
+      res.json(await shapeClaimHelp());
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  function companyObjId(id) {
+    if (!ObjectId.isValid(id)) return null;
+    return new ObjectId(id);
+  }
+
+  // Create a new company (multipart: file = profile image, companyName = text)
+  router.post('/claimhelp/company', upload.single('file'), async (req, res) => {
+    try {
+      const companyName = (req.body.companyName || '').trim();
+      if (!companyName) {
+        return res.status(400).json({ error: 'companyName is required' });
+      }
+      const parseList = (value) => {
+        if (!value) return [];
+        if (Array.isArray(value)) return value;
+        try {
+          return JSON.parse(value);
+        } catch (_err) {
+          return null;
+        }
+      };
+      const procedures = parseList(req.body.procedures);
+      const helplineNumbers = parseList(req.body.helplineNumbers);
+      if (procedures === null || helplineNumbers === null) {
+        return res.status(400).json({ error: 'Invalid procedures or helpline numbers' });
+      }
+      if (!Array.isArray(procedures) || !Array.isArray(helplineNumbers)) {
+        return res.status(400).json({ error: 'Procedures and helpline numbers must be arrays' });
+      }
+      const normalizedProcedures = procedures.map((text) => String(text || '').trim()).filter(Boolean);
+      const normalizedHelplineNumbers = helplineNumbers.map((number) => String(number || '').trim()).filter(Boolean);
+      if (normalizedHelplineNumbers.some((number) => !validHelpline(number))) {
+        return res.status(400).json({ error: 'Helpline number must be exactly 10 digits' });
+      }
+      const doc = { companyName, companyProfileImage: null, createdAt: new Date(), updatedAt: new Date() };
+      if (req.file) {
+        const buffer = fs.readFileSync(req.file.path);
+        const storageResult = await uploadBufferToStorage(buffer, req.file.filename, 'content', req.file.mimetype);
+        doc.companyProfileImage = storageResult.publicUrl || toPublicHttpsUrl(`/uploads/content/${req.file.filename}`);
+      }
+      const result = await claimHelpCol.insertOne(doc);
+      try {
+        if (normalizedProcedures.length) {
+          await proceduresCol.insertMany(normalizedProcedures.map((text, order) => ({
+            companyId: result.insertedId,
+            text,
+            order,
+            createdAt: new Date(),
+          })));
+        }
+        if (normalizedHelplineNumbers.length) {
+          await helplinesCol.insertMany(normalizedHelplineNumbers.map((number, order) => ({
+            companyId: result.insertedId,
+            number,
+            order,
+            createdAt: new Date(),
+          })));
+        }
+      } catch (error) {
+        await Promise.all([
+          claimHelpCol.deleteOne({ _id: result.insertedId }),
+          proceduresCol.deleteMany({ companyId: result.insertedId }),
+          helplinesCol.deleteMany({ companyId: result.insertedId }),
+        ]);
+        throw error;
+      }
+      res.status(201).json(await shapeCompanyFull(result.insertedId));
+    } catch (e) {
+      console.error('[Claim Help] Failed to create company:', e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Single company full view
+  router.get('/claimhelp/company/:companyId', async (req, res) => {
+    try {
+      const cid = companyObjId(req.params.companyId);
+      if (!cid) return res.status(400).json({ error: 'Invalid company id' });
+      const full = await shapeCompanyFull(req.params.companyId);
+      if (!full) return res.status(404).json({ error: 'Company not found' });
+      res.json(full);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Update a company profile (multipart: file?, companyName?, removeImage?)
+  router.put('/claimhelp/company/:companyId', upload.single('file'), async (req, res) => {
+    try {
+      const cid = companyObjId(req.params.companyId);
+      if (!cid) return res.status(400).json({ error: 'Invalid company id' });
+      const companyName = (req.body.companyName || '').trim();
+      if (!companyName) {
+        return res.status(400).json({ error: 'companyName is required' });
+      }
+      const removeImage = req.body.removeImage === 'true' || req.body.removeImage === true;
+      const setFields = { companyName, updatedAt: new Date() };
+      if (removeImage) {
+        setFields.companyProfileImage = null;
+      } else if (req.file) {
+        const buffer = fs.readFileSync(req.file.path);
+        const storageResult = await uploadBufferToStorage(buffer, req.file.filename, 'content', req.file.mimetype);
+        setFields.companyProfileImage = storageResult.publicUrl || toPublicHttpsUrl(`/uploads/content/${req.file.filename}`);
+      }
+      const result = await claimHelpCol.updateOne({ _id: cid }, { $set: setFields });
+      if (result.matchedCount === 0) return res.status(404).json({ error: 'Company not found' });
+      res.json(await shapeCompanyFull(req.params.companyId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Delete a company + cascade its procedures & helplines
+  router.delete('/claimhelp/company/:companyId', async (req, res) => {
+    try {
+      const cid = companyObjId(req.params.companyId);
+      if (!cid) return res.status(400).json({ error: 'Invalid company id' });
+      await proceduresCol.deleteMany({ companyId: cid });
+      await helplinesCol.deleteMany({ companyId: cid });
+      const result = await claimHelpCol.deleteOne({ _id: cid });
+      if (result.deletedCount === 0) return res.status(404).json({ error: 'Company not found' });
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ---------- PROCEDURES (per company) ----------
+  router.get('/claimhelp/company/:companyId/procedures', async (req, res) => {
+    try {
+      const cid = companyObjId(req.params.companyId);
+      if (!cid) return res.status(400).json({ error: 'Invalid company id' });
+      const docs = await proceduresCol.find({ companyId: cid }).sort({ order: 1 }).toArray();
+      res.json(docs.map(shapeProcedure));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post('/claimhelp/company/:companyId/procedures', async (req, res) => {
+    try {
+      const cid = companyObjId(req.params.companyId);
+      if (!cid) return res.status(400).json({ error: 'Invalid company id' });
+      const text = (req.body.text || '').trim();
+      if (!text) return res.status(400).json({ error: 'text is required' });
+      const count = await proceduresCol.countDocuments({ companyId: cid });
+      const doc = { companyId: cid, text, order: count, createdAt: new Date() };
+      const result = await proceduresCol.insertOne(doc);
+      res.status(201).json({ item: shapeProcedure({ ...doc, _id: result.insertedId }) });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.patch('/claimhelp/company/:companyId/procedures/:procId', async (req, res) => {
+    try {
+      const cid = companyObjId(req.params.companyId);
+      if (!cid) return res.status(400).json({ error: 'Invalid company id' });
+      const pid = req.params.procId;
+      const text = (req.body.text || '').trim();
+      if (!text) return res.status(400).json({ error: 'text is required' });
+      const pfilter = ObjectId.isValid(pid) ? { _id: new ObjectId(pid) } : { id: pid };
+      const result = await proceduresCol.updateOne({ companyId: cid, ...pfilter }, { $set: { text } });
+      if (result.matchedCount === 0) return res.status(404).json({ error: 'procedure not found' });
+      const updated = await proceduresCol.findOne(pfilter);
+      res.json({ item: shapeProcedure(updated) });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.put('/claimhelp/company/:companyId/procedures/reorder', async (req, res) => {
+    try {
+      const cid = companyObjId(req.params.companyId);
+      if (!cid) return res.status(400).json({ error: 'Invalid company id' });
+      const { orderedIds } = req.body;
+      if (!Array.isArray(orderedIds)) {
+        return res.status(400).json({ error: 'orderedIds is required' });
+      }
+      const bulk = orderedIds.map((id, index) => ({
+        updateOne: {
+          filter: { companyId: cid, ...(ObjectId.isValid(id) ? { _id: new ObjectId(id) } : { id }) },
+          update: { $set: { order: index } },
+        },
+      }));
+      if (bulk.length) await proceduresCol.bulkWrite(bulk);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.delete('/claimhelp/company/:companyId/procedures/:procId', async (req, res) => {
+    try {
+      const cid = companyObjId(req.params.companyId);
+      if (!cid) return res.status(400).json({ error: 'Invalid company id' });
+      const pid = req.params.procId;
+      const pfilter = ObjectId.isValid(pid) ? { _id: new ObjectId(pid) } : { id: pid };
+      const result = await proceduresCol.deleteOne({ companyId: cid, ...pfilter });
+      if (result.deletedCount === 0) return res.status(404).json({ error: 'procedure not found' });
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ---------- HELPLINE NUMBERS (per company) ----------
+  router.get('/claimhelp/company/:companyId/helplines', async (req, res) => {
+    try {
+      const cid = companyObjId(req.params.companyId);
+      if (!cid) return res.status(400).json({ error: 'Invalid company id' });
+      const docs = await helplinesCol.find({ companyId: cid }).sort({ order: 1 }).toArray();
+      res.json(docs.map(shapeHelpline));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post('/claimhelp/company/:companyId/helplines', async (req, res) => {
+    try {
+      const cid = companyObjId(req.params.companyId);
+      if (!cid) return res.status(400).json({ error: 'Invalid company id' });
+      const number = (req.body.number || '').trim();
+      if (!validHelpline(number)) {
+        return res.status(400).json({ error: 'Helpline number must be exactly 10 digits' });
+      }
+      const count = await helplinesCol.countDocuments({ companyId: cid });
+      const doc = { companyId: cid, number, order: count, createdAt: new Date() };
+      const result = await helplinesCol.insertOne(doc);
+      res.status(201).json({ item: shapeHelpline({ ...doc, _id: result.insertedId }) });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.patch('/claimhelp/company/:companyId/helplines/:helpId', async (req, res) => {
+    try {
+      const cid = companyObjId(req.params.companyId);
+      if (!cid) return res.status(400).json({ error: 'Invalid company id' });
+      const hid = req.params.helpId;
+      const number = (req.body.number || '').trim();
+      if (!validHelpline(number)) {
+        return res.status(400).json({ error: 'Helpline number must be exactly 10 digits' });
+      }
+      const hfilter = ObjectId.isValid(hid) ? { _id: new ObjectId(hid) } : { id: hid };
+      const result = await helplinesCol.updateOne({ companyId: cid, ...hfilter }, { $set: { number } });
+      if (result.matchedCount === 0) return res.status(404).json({ error: 'helpline not found' });
+      const updated = await helplinesCol.findOne(hfilter);
+      res.json({ item: shapeHelpline(updated) });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.put('/claimhelp/company/:companyId/helplines/reorder', async (req, res) => {
+    try {
+      const cid = companyObjId(req.params.companyId);
+      if (!cid) return res.status(400).json({ error: 'Invalid company id' });
+      const { orderedIds } = req.body;
+      if (!Array.isArray(orderedIds)) {
+        return res.status(400).json({ error: 'orderedIds is required' });
+      }
+      const bulk = orderedIds.map((id, index) => ({
+        updateOne: {
+          filter: { companyId: cid, ...(ObjectId.isValid(id) ? { _id: new ObjectId(id) } : { id }) },
+          update: { $set: { order: index } },
+        },
+      }));
+      if (bulk.length) await helplinesCol.bulkWrite(bulk);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.delete('/claimhelp/company/:companyId/helplines/:helpId', async (req, res) => {
+    try {
+      const cid = companyObjId(req.params.companyId);
+      if (!cid) return res.status(400).json({ error: 'Invalid company id' });
+      const hid = req.params.helpId;
+      const hfilter = ObjectId.isValid(hid) ? { _id: new ObjectId(hid) } : { id: hid };
+      const result = await helplinesCol.deleteOne({ companyId: cid, ...hfilter });
+      if (result.deletedCount === 0) return res.status(404).json({ error: 'helpline not found' });
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: e.message });

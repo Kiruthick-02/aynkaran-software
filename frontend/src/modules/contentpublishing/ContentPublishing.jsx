@@ -17,6 +17,9 @@ import {
   ChevronUp,
   ChevronDown,
   Plus,
+  HelpCircle,
+  Edit,
+  Save,
 } from 'lucide-react';
 import API_URL from '../../config/api';
 
@@ -424,6 +427,27 @@ export default function ContentPublishing({ onShowNotification }) {
   const [customerAnnouncements, setCustomerAnnouncements] = useState([]);
   const [advisorAnnouncements, setAdvisorAnnouncements] = useState([]);
 
+  // Claim Help (multi-company)
+  const [claimHelpCompanies, setClaimHelpCompanies] = useState([]);
+  const [activeClaimCompanyId, setActiveClaimCompanyId] = useState(null);
+  const [claimCompanyName, setClaimCompanyName] = useState('');
+  const [claimCompanyImageFile, setClaimCompanyImageFile] = useState(null);
+  const [claimCompanyImagePreview, setClaimCompanyImagePreview] = useState('');
+  const [claimCompanySaving, setClaimCompanySaving] = useState(false);
+  const [showNewCompanyForm, setShowNewCompanyForm] = useState(false);
+  const [newCompanyName, setNewCompanyName] = useState('');
+  const [newCompanyImageFile, setNewCompanyImageFile] = useState(null);
+  const [newCompanyImagePreview, setNewCompanyImagePreview] = useState('');
+  const [newCompanyProcedures, setNewCompanyProcedures] = useState(['']);
+  const [newCompanyHelplines, setNewCompanyHelplines] = useState(['']);
+  const [newCompanyCreating, setNewCompanyCreating] = useState(false);
+  const [procInput, setProcInput] = useState('');
+  const [procEditingId, setProcEditingId] = useState(null);
+  const [procEditValue, setProcEditValue] = useState('');
+  const [helpInput, setHelpInput] = useState('');
+  const [helpEditingId, setHelpEditingId] = useState(null);
+  const [helpEditValue, setHelpEditValue] = useState('');
+
   // News form
   const [newsTitle, setNewsTitle] = useState('');
   const [newsDesc, setNewsDesc] = useState('');
@@ -476,6 +500,11 @@ const makeBold = (text, start, end) => {
         setGallery(data.gallery || []);
         setCustomerAnnouncements(data.announcements?.customers || []);
         setAdvisorAnnouncements(data.announcements?.advisors || []);
+        if (data.claimHelp) {
+          const cos = data.claimHelp.companies || [];
+          setClaimHelpCompanies(cos);
+          setActiveClaimCompanyId(null);
+        }
       }
 
       if (data.categories) {
@@ -627,6 +656,428 @@ const addCategory = async (type) => {
     }
   };
 
+  // ----- Claim Help: multi-company -----
+  const activeClaimCompany = claimHelpCompanies.find((c) => c.id === activeClaimCompanyId) || null;
+
+  const syncActiveCompany = (company) => {
+    setClaimHelpCompanies((prev) => prev.map((c) => (c.id === company.id ? company : c)));
+  };
+
+  const onNewCompanyImage = (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    if (!f.type.startsWith('image/')) {
+      notify('Please select an image file');
+      return;
+    }
+    if (newCompanyImagePreview) URL.revokeObjectURL(newCompanyImagePreview);
+    setNewCompanyImageFile(f);
+    setNewCompanyImagePreview(URL.createObjectURL(f));
+  };
+
+  const onCreateCompany = async (e) => {
+    if (e) e.preventDefault();
+    const name = newCompanyName.trim();
+    const validationError = validateClaimCompanyData({
+      name,
+      image: newCompanyImageFile || newCompanyImagePreview,
+      procedures: newCompanyProcedures,
+      helplines: newCompanyHelplines,
+    });
+    if (validationError) {
+      notify(validationError);
+      return;
+    }
+    setNewCompanyCreating(true);
+    try {
+      const fd = new FormData();
+      fd.append('companyName', name);
+      if (newCompanyImageFile) fd.append('file', newCompanyImageFile);
+      const procedures = newCompanyProcedures.map((value) => value.trim()).filter(Boolean);
+      const helplineNumbers = newCompanyHelplines.map((value) => onlyDigits(value)).filter(Boolean);
+      if (helplineNumbers.some((number) => number.length !== 10)) {
+        notify('Each helpline number must contain exactly 10 digits');
+        return;
+      }
+      fd.append('procedures', JSON.stringify(procedures));
+      fd.append('helplineNumbers', JSON.stringify(helplineNumbers));
+
+      const created = await apiJson('/api/content/claimhelp/company', {
+        method: 'POST',
+        body: fd,
+      });
+      const co = created.company || created;
+      setClaimHelpCompanies((prev) => [...prev, co]);
+      setActiveClaimCompanyId(co.id);
+      setClaimCompanyName(co.companyName || '');
+      setClaimCompanyImagePreview(co.companyProfileImage || '');
+      setClaimCompanyImageFile(null);
+      setNewCompanyName('');
+      setNewCompanyProcedures(['']);
+      setNewCompanyHelplines(['']);
+      if (newCompanyImagePreview) {
+        URL.revokeObjectURL(newCompanyImagePreview);
+        setNewCompanyImageFile(null);
+        setNewCompanyImagePreview('');
+      }
+      setShowNewCompanyForm(false);
+      notify('Company added');
+    } catch (err) {
+      notify(err.message || 'Failed to add company');
+    } finally {
+      setNewCompanyCreating(false);
+    }
+  };
+
+  const resetNewCompanyForm = () => {
+    setShowNewCompanyForm(false);
+    setNewCompanyName('');
+    setNewCompanyProcedures(['']);
+    setNewCompanyHelplines(['']);
+    if (newCompanyImagePreview) {
+      URL.revokeObjectURL(newCompanyImagePreview);
+      setNewCompanyImageFile(null);
+      setNewCompanyImagePreview('');
+    }
+  };
+
+  const onClaimCompanyImage = (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    if (!f.type.startsWith('image/')) {
+      notify('Please select an image file');
+      return;
+    }
+    if (claimCompanyImagePreview && !activeClaimCompany?.companyProfileImage) {
+      URL.revokeObjectURL(claimCompanyImagePreview);
+    }
+    setClaimCompanyImageFile(f);
+    setClaimCompanyImagePreview(URL.createObjectURL(f));
+  };
+
+  const removeClaimCompanyImage = () => {
+    if (claimCompanyImagePreview && !activeClaimCompany?.companyProfileImage) {
+      URL.revokeObjectURL(claimCompanyImagePreview);
+    }
+    setClaimCompanyImageFile(null);
+    setClaimCompanyImagePreview('');
+  };
+
+  const saveClaimCompanyProfile = async (e) => {
+    if (e) e.preventDefault();
+    if (!activeClaimCompanyId) {
+      notify('Select or add a company first');
+      return;
+    }
+    const name = claimCompanyName.trim();
+    const validationError = validateClaimCompanyData({
+      name,
+      image: claimCompanyImageFile || claimCompanyImagePreview,
+      procedures: companyProcedures,
+      helplines: activeClaimCompany?.helplineNumbers || [],
+    });
+    if (validationError) {
+      notify(validationError);
+      return;
+    }
+    setClaimCompanySaving(true);
+    try {
+      const fd = new FormData();
+      fd.append('companyName', name);
+      if (claimCompanyImageFile) fd.append('file', claimCompanyImageFile);
+
+      const saved = await apiJson(`/api/content/claimhelp/company/${activeClaimCompanyId}`, {
+        method: 'PUT',
+        body: fd,
+      });
+      const co = saved.company || saved;
+      syncActiveCompany(co);
+      setClaimCompanyName(co.companyName || name);
+      setClaimCompanyImagePreview(co.companyProfileImage || '');
+      setClaimCompanyImageFile(null);
+      notify('Claim Help profile saved');
+    } catch (err) {
+      notify(err.message || 'Failed to save profile');
+    } finally {
+      setClaimCompanySaving(false);
+    }
+  };
+
+  const deleteClaimCompany = async (id) => {
+    const name = claimHelpCompanies.find((c) => c.id === id)?.companyName || 'company';
+    if (!window.confirm(`Remove "${name}" and all its Claim Help data?`)) return;
+    try {
+      await apiJson(`/api/content/claimhelp/company/${id}`, { method: 'DELETE' });
+      setClaimHelpCompanies((prev) => prev.filter((c) => c.id !== id));
+      if (activeClaimCompanyId === id) {
+        setActiveClaimCompanyId(null);
+        setClaimCompanyName('');
+        setClaimCompanyImagePreview('');
+        setClaimCompanyImageFile(null);
+      }
+      notify('Company removed');
+    } catch (err) {
+      notify(err.message || 'Failed to remove company');
+    }
+  };
+
+  // Sync the profile form fields whenever the active company changes
+  useEffect(() => {
+    if (activeClaimCompany) {
+      setClaimCompanyName(activeClaimCompany.companyName || '');
+      setClaimCompanyImagePreview(activeClaimCompany.companyProfileImage || '');
+      setClaimCompanyImageFile(null);
+    } else {
+      setClaimCompanyName('');
+      setClaimCompanyImagePreview('');
+      setClaimCompanyImageFile(null);
+    }
+  }, [activeClaimCompanyId]);
+
+  // ----- Claim Help: Procedures (per company) -----
+  const companyProcedures = activeClaimCompany?.procedures || [];
+
+  const addProcedure = async () => {
+    if (!activeClaimCompanyId) return notify('Select a company first');
+    const text = procInput.trim();
+    if (!text) {
+      notify('Enter a procedure step');
+      return;
+    }
+    try {
+      const saved = await apiJson(`/api/content/claimhelp/company/${activeClaimCompanyId}/procedures`, {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+      });
+      const item = saved.item || saved;
+      setClaimHelpCompanies((prev) =>
+        prev.map((c) =>
+          c.id === activeClaimCompanyId
+            ? { ...c, procedures: [...(c.procedures || []), item] }
+            : c
+        )
+      );
+      setProcInput('');
+      notify('Procedure step added');
+    } catch (err) {
+      notify(err.message || 'Failed to add procedure');
+    }
+  };
+
+  const startEditProcedure = (id, text) => {
+    setProcEditingId(id);
+    setProcEditValue(text);
+  };
+
+  const saveEditProcedure = async (id) => {
+    if (!activeClaimCompanyId) return;
+    const text = procEditValue.trim();
+    if (!text) {
+      notify('Procedure text cannot be empty');
+      return;
+    }
+    try {
+      const saved = await apiJson(`/api/content/claimhelp/company/${activeClaimCompanyId}/procedures/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ text }),
+      });
+      const updated = saved.item || saved;
+      setClaimHelpCompanies((prev) =>
+        prev.map((c) =>
+          c.id === activeClaimCompanyId
+            ? { ...c, procedures: c.procedures.map((p) => (p.id === id ? updated : p)) }
+            : c
+        )
+      );
+      setProcEditingId(null);
+      notify('Procedure updated');
+    } catch (err) {
+      notify(err.message || 'Failed to update procedure');
+    }
+  };
+
+  const cancelEditProcedure = () => {
+    setProcEditingId(null);
+    setProcEditValue('');
+  };
+
+  const deleteProcedure = async (id) => {
+    if (!activeClaimCompanyId) return;
+    if (!window.confirm('Remove this procedure step?')) return;
+    try {
+      await apiJson(`/api/content/claimhelp/company/${activeClaimCompanyId}/procedures/${id}`, { method: 'DELETE' });
+      setClaimHelpCompanies((prev) =>
+        prev.map((c) =>
+          c.id === activeClaimCompanyId
+            ? { ...c, procedures: c.procedures.filter((p) => p.id !== id) }
+            : c
+        )
+      );
+      notify('Procedure step removed');
+    } catch (err) {
+      notify(err.message || 'Failed to remove procedure');
+    }
+  };
+
+  const moveProcedure = async (index, direction) => {
+    if (!activeClaimCompanyId) return;
+    const list = [...companyProcedures];
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= list.length) return;
+    [list[index], list[newIndex]] = [list[newIndex], list[index]];
+    setClaimHelpCompanies((prev) =>
+      prev.map((c) => (c.id === activeClaimCompanyId ? { ...c, procedures: list } : c))
+    );
+    try {
+      await apiJson(`/api/content/claimhelp/company/${activeClaimCompanyId}/procedures/reorder`, {
+        method: 'PUT',
+        body: JSON.stringify({ orderedIds: list.map((p) => p.id) }),
+      });
+    } catch (e) {
+      notify(e.message || 'Reorder failed');
+    }
+  };
+
+  const onlyDigits = (value) => value.replace(/\D/g, '').slice(0, 10);
+
+  const validateClaimCompanyData = ({ name, image, procedures, helplines }) => {
+    const safeName = String(name || '').trim();
+    if (!safeName) return 'Company name is required';
+    if (!image) return 'Company profile image is required';
+
+    const validProcedures = (procedures || [])
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+    if (validProcedures.length === 0) return 'At least one procedure step is required';
+
+    const validHelplines = (helplines || [])
+      .map((item) => onlyDigits(String(item || '')))
+      .filter((item) => item.length === 10);
+    if (validHelplines.length === 0) return 'At least one valid 10-digit helpline number is required';
+    if (validHelplines.length !== (helplines || []).map((item) => onlyDigits(String(item || ''))).filter((item) => item).length) {
+      return 'Each helpline number must contain exactly 10 digits';
+    }
+
+    return null;
+  };
+
+  const newCompanyFormReady = Boolean(
+    newCompanyName.trim() &&
+      (newCompanyImagePreview || newCompanyImageFile) &&
+      newCompanyProcedures.some((item) => String(item || '').trim()) &&
+      newCompanyHelplines.some((item) => onlyDigits(String(item || '')).length === 10)
+  );
+
+  const activeCompanyFormReady = Boolean(
+    claimCompanyName.trim() &&
+      (claimCompanyImagePreview || claimCompanyImageFile) &&
+      companyProcedures.some((item) => String(item?.text || '').trim()) &&
+      (activeClaimCompany?.helplineNumbers || []).some((item) => String(item?.number || '').length === 10)
+  );
+
+  const addHelpline = async () => {
+    if (!activeClaimCompanyId) return notify('Select a company first');
+    const number = onlyDigits(helpInput);
+    if (!number || number.length !== 10) {
+      notify('Enter a valid 10-digit helpline number');
+      return;
+    }
+    try {
+      const saved = await apiJson(`/api/content/claimhelp/company/${activeClaimCompanyId}/helplines`, {
+        method: 'POST',
+        body: JSON.stringify({ number }),
+      });
+      const item = saved.item || saved;
+      setClaimHelpCompanies((prev) =>
+        prev.map((c) =>
+          c.id === activeClaimCompanyId
+            ? { ...c, helplineNumbers: [...(c.helplineNumbers || []), item] }
+            : c
+        )
+      );
+      setHelpInput('');
+      notify('Helpline number added');
+    } catch (err) {
+      notify(err.message || 'Failed to add helpline');
+    }
+  };
+
+  const startEditHelpline = (id, number) => {
+    setHelpEditingId(id);
+    setHelpEditValue(number);
+  };
+
+  const saveEditHelpline = async (id) => {
+    if (!activeClaimCompanyId) return;
+    const number = onlyDigits(helpEditValue);
+    if (!number || number.length !== 10) {
+      notify('Helpline number must be exactly 10 digits');
+      return;
+    }
+    try {
+      const saved = await apiJson(`/api/content/claimhelp/company/${activeClaimCompanyId}/helplines/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ number }),
+      });
+      const updated = saved.item || saved;
+      setClaimHelpCompanies((prev) =>
+        prev.map((c) =>
+          c.id === activeClaimCompanyId
+            ? { ...c, helplineNumbers: c.helplineNumbers.map((h) => (h.id === id ? updated : h)) }
+            : c
+        )
+      );
+      setHelpEditingId(null);
+      notify('Helpline number updated');
+    } catch (err) {
+      notify(err.message || 'Failed to update helpline');
+    }
+  };
+
+  const cancelEditHelpline = () => {
+    setHelpEditingId(null);
+    setHelpEditValue('');
+  };
+
+  const deleteHelpline = async (id) => {
+    if (!activeClaimCompanyId) return;
+    if (!window.confirm('Remove this helpline number?')) return;
+    try {
+      await apiJson(`/api/content/claimhelp/company/${activeClaimCompanyId}/helplines/${id}`, { method: 'DELETE' });
+      setClaimHelpCompanies((prev) =>
+        prev.map((c) =>
+          c.id === activeClaimCompanyId
+            ? { ...c, helplineNumbers: c.helplineNumbers.filter((h) => h.id !== id) }
+            : c
+        )
+      );
+      notify('Helpline number removed');
+    } catch (err) {
+      notify(err.message || 'Failed to remove helpline');
+    }
+  };
+
+  const moveHelpline = async (index, direction) => {
+    if (!activeClaimCompanyId) return;
+    const list = [...(activeClaimCompany?.helplineNumbers || [])];
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= list.length) return;
+    [list[index], list[newIndex]] = [list[newIndex], list[index]];
+    setClaimHelpCompanies((prev) =>
+      prev.map((c) => (c.id === activeClaimCompanyId ? { ...c, helplineNumbers: list } : c))
+    );
+    try {
+      await apiJson(`/api/content/claimhelp/company/${activeClaimCompanyId}/helplines/reorder`, {
+        method: 'PUT',
+        body: JSON.stringify({ orderedIds: list.map((h) => h.id) }),
+      });
+    } catch (e) {
+      notify(e.message || 'Reorder failed');
+    }
+  };
+
   // ----- News -----
   const onNewsFile = (e) => {
     const f = e.target.files?.[0];
@@ -742,6 +1193,7 @@ const addCategory = async (type) => {
     { id: 'news', label: 'News / Blogs', icon: Newspaper },
     { id: 'gallery', label: 'Gallery', icon: Images },
     { id: 'announcements', label: 'Live Announcement', icon: Megaphone },
+    { id: 'claimhelp', label: 'Claim Help', icon: HelpCircle },
   ];
 
   return (
@@ -1121,6 +1573,547 @@ const addCategory = async (type) => {
     </div>
   </div>
 )}
+
+    {/* ========== CLAIM HELP (multi-company) ========== */}
+    {tab === 'claimhelp' && (
+      <div className="space-y-5">
+        <div>
+          <h2 className="text-sm font-bold text-white">Claim Help</h2>
+          <p className="text-[11px] text-slate-400 mt-1">
+            Manage multiple company profiles shown on the website <strong>Claim Help</strong> section. For each company, add Procedure steps and Contact helpline numbers with the <Plus className="w-3 h-3 inline" /> buttons. Helpline numbers accept exactly 10 digits. Changes sync to the public website.
+          </p>
+        </div>
+
+        {/* ===== Company cards + New company form ===== */}
+        <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-xs font-bold uppercase text-slate-400 tracking-widest">Companies</h3>
+            <button
+              type="button"
+              onClick={() => setShowNewCompanyForm(true)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#0078d4] hover:bg-blue-600 text-white shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add Company
+            </button>
+          </div>
+
+          {claimHelpCompanies.length === 0 ? (
+            <div className="text-center py-4 text-xs text-slate-500">
+              No companies added yet. Add your first company below.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {claimHelpCompanies.map((co) => (
+                <div
+                  key={co.id}
+                  className={`rounded-xl border p-3 text-left transition-all ${
+                    activeClaimCompanyId === co.id
+                      ? 'bg-blue-600/15 border-blue-500'
+                      : 'bg-slate-900 border-slate-700 hover:border-slate-600'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveClaimCompanyId(co.id);
+                      setShowNewCompanyForm(false);
+                    }}
+                    className="w-full flex items-center gap-3"
+                  >
+                    {co.companyProfileImage ? (
+                      <img src={mediaUrl(co.companyProfileImage)} alt="" className="w-11 h-11 rounded-lg object-contain bg-slate-950 shrink-0" />
+                    ) : (
+                      <div className="w-11 h-11 rounded-lg bg-slate-800 flex items-center justify-center shrink-0">
+                        <ImageIcon className="w-5 h-5 text-slate-500" />
+                      </div>
+                    )}
+                    <span className="min-w-0">
+                      <span className="block text-xs font-bold text-white truncate">{co.companyName || co.name || 'Unnamed'}</span>
+                      <span className="block text-[10px] text-slate-400 mt-1">
+                        {(co.procedures || []).length} procedure{(co.procedures || []).length === 1 ? '' : 's'} · {(co.helplineNumbers || []).length} helpline{(co.helplineNumbers || []).length === 1 ? '' : 's'}
+                      </span>
+                    </span>
+                  </button>
+                  <div className="flex gap-2 mt-3 pt-2 border-t border-slate-700">
+                    <button
+                      type="button"
+                      onClick={() => setActiveClaimCompanyId(co.id)}
+                      className="flex-1 px-2 py-1 rounded-md text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-200"
+                    >
+                      <Edit className="w-3 h-3 inline mr-1" /> Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteClaimCompany(co.id)}
+                      className="px-2 py-1 rounded-md text-[10px] font-bold bg-rose-600/80 hover:bg-rose-600 text-white"
+                      title="Delete company"
+                    >
+                      <Trash2 className="w-3 h-3 inline" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+        </div>
+
+        {showNewCompanyForm && (
+          <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={resetNewCompanyForm}>
+            <form
+              onSubmit={onCreateCompany}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-5 space-y-4"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-white">Add New Company</h3>
+                  <p className="text-[10px] text-slate-400 mt-1">Add the company profile, procedures, and contact helpline numbers.</p>
+                </div>
+                <button type="button" onClick={resetNewCompanyForm} className="text-slate-400 hover:text-white" title="Close">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase text-slate-400 font-bold">Company Profile</label>
+                  <label className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-slate-600 bg-slate-950/50 hover:border-blue-500/50 px-3 py-5 cursor-pointer min-h-[130px]">
+                    {newCompanyImagePreview ? (
+                      <img src={newCompanyImagePreview} alt="" className="max-h-24 rounded object-contain" />
+                    ) : (
+                      <>
+                        <ImageIcon className="w-6 h-6 text-slate-500" />
+                        <span className="text-[11px] text-slate-400">Click to choose image</span>
+                      </>
+                    )}
+                    <input type="file" accept="image/*" className="hidden" onChange={onNewCompanyImage} />
+                  </label>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase text-slate-400 font-bold">Company name *</label>
+                  <input
+                    value={newCompanyName}
+                    onChange={(e) => setNewCompanyName(e.target.value)}
+                    placeholder="e.g. Company name"
+                    maxLength={60}
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+                  />
+                  <span className="block text-right text-[10px] text-slate-600">{newCompanyName.length}/60</span>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase text-slate-400 font-bold">Procedures</label>
+                <div className="space-y-2">
+                  {newCompanyProcedures.map((procedure, index) => (
+                    <div key={`procedure-${index}`} className="flex gap-2">
+                      <input
+                        value={procedure}
+                        onChange={(e) => setNewCompanyProcedures((prev) => prev.map((value, itemIndex) => itemIndex === index ? e.target.value : value))}
+                        placeholder="Enter a procedure step"
+                        className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+                      />
+                      {index === newCompanyProcedures.length - 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => setNewCompanyProcedures((prev) => [...prev, ''])}
+                          className="w-9 rounded-lg bg-[#0078d4] hover:bg-blue-600 text-white flex items-center justify-center"
+                          title="Add procedure"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setNewCompanyProcedures((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}
+                          className="w-9 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center"
+                          title="Remove procedure"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase text-slate-400 font-bold">Contact Helpline number</label>
+                <div className="space-y-2">
+                  {newCompanyHelplines.map((number, index) => (
+                    <div key={`helpline-${index}`} className="flex gap-2">
+                      <input
+                        value={number}
+                        onChange={(e) => setNewCompanyHelplines((prev) => prev.map((value, itemIndex) => itemIndex === index ? onlyDigits(e.target.value) : value))}
+                        type="tel"
+                        inputMode="numeric"
+                        maxLength={10}
+                        pattern="[0-9]{10}"
+                        placeholder="10-digit helpline number"
+                        className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-blue-500 font-mono"
+                      />
+                      {index === newCompanyHelplines.length - 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => setNewCompanyHelplines((prev) => [...prev, ''])}
+                          className="w-9 rounded-lg bg-[#0078d4] hover:bg-blue-600 text-white flex items-center justify-center"
+                          title="Add helpline number"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setNewCompanyHelplines((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}
+                          className="w-9 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center"
+                          title="Remove helpline number"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-slate-500">Only numbers are accepted, with a maximum of 10 digits per field.</p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-700">
+                <button type="button" onClick={resetNewCompanyForm} className="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={newCompanyCreating || !newCompanyFormReady}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#0078d4] hover:bg-blue-600 text-white disabled:opacity-60 flex items-center gap-1.5"
+                >
+                  {newCompanyCreating ? 'Saving…' : <><Save className="w-3.5 h-3.5" /> Save Company</>}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* ===== Active company profile ===== */}
+        {activeClaimCompany ? (
+          <>
+            {/* Company Profile Image + Company Name + Save */}
+            <form
+              onSubmit={saveClaimCompanyProfile}
+              className="rounded-xl border border-slate-700 bg-slate-800/50 p-4 space-y-4"
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="text-xs font-bold uppercase text-slate-400 tracking-widest">Company Profile</h3>
+                <button
+                  type="button"
+                  onClick={() => deleteClaimCompany(activeClaimCompany.id)}
+                  className="p-1 rounded bg-rose-600/80 hover:bg-rose-600 text-white"
+                  title="Delete company"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                {/* Company Profile Image */}
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase text-slate-400 font-bold">Company Profile image *</label>
+                  <label
+                    className={`flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-5 cursor-pointer min-h-[120px] ${
+                      claimCompanyImagePreview
+                        ? 'border-slate-600 bg-slate-900/50 hover:border-blue-500/50'
+                        : 'border-slate-600 bg-slate-900/50 hover:border-blue-500/50'
+                    }`}
+                  >
+                    {claimCompanyImagePreview ? (
+                      <img src={claimCompanyImagePreview} alt="" className="max-h-28 rounded object-contain" />
+                    ) : (
+                      <>
+                        <ImageIcon className="w-6 h-6 text-slate-500" />
+                        <span className="text-[11px] text-slate-400">Click to choose image</span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={onClaimCompanyImage}
+                    />
+                  </label>
+                  {claimCompanyImagePreview && (
+                    <button
+                      type="button"
+                      onClick={removeClaimCompanyImage}
+                      className="text-[10px] text-rose-400 hover:text-rose-300 font-medium"
+                    >
+                      Remove image
+                    </button>
+                  )}
+                </div>
+
+                {/* Company Name */}
+                <div className="space-y-1 xl:self-end">
+                  <label className="text-[10px] uppercase text-slate-400 font-bold">Company name *</label>
+                  <div className="relative">
+                    <input
+                      value={claimCompanyName}
+                      onChange={(e) => setClaimCompanyName(e.target.value)}
+                      placeholder="e.g. Aynkaran Consultants"
+                      maxLength={60}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-600">{claimCompanyName.length}/60</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={claimCompanySaving || !activeCompanyFormReady}
+                className="w-full py-2 rounded-lg text-xs font-bold bg-[#0078d4] hover:bg-blue-600 text-white disabled:opacity-60 flex items-center justify-center gap-1.5"
+              >
+                {claimCompanySaving ? 'Saving…' : <><Save className="w-3.5 h-3.5" /> Save Profile</>}
+              </button>
+            </form>
+
+            {/* ===== Procedure (add + edit) ===== */}
+            <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4 space-y-3">
+              <h3 className="text-xs font-bold uppercase text-slate-400 tracking-widest">Procedure</h3>
+              <p className="text-[10px] text-slate-500">
+                Add each step of the claim procedure. Click the pencil icon to edit a step. Use ↑↓ to reorder.
+              </p>
+
+              <div className="flex gap-2">
+                <input
+                  value={procInput}
+                  onChange={(e) => setProcInput(e.target.value)}
+                  placeholder="e.g. Submit your claim form online…"
+                  className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={addProcedure}
+                  className="inline-flex items-center gap-1 px-3 rounded-lg text-xs font-bold bg-[#0078d4] hover:bg-blue-600 text-white"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {companyProcedures.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/40 p-6 text-center text-xs text-slate-500">
+                  No procedure steps yet. Type a step and click +.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {companyProcedures.map((item, index) => (
+                    <div
+                      key={item.id}
+                      className="rounded-xl border border-slate-700 bg-slate-800/60 p-3 flex gap-2 items-start"
+                    >
+                      <div className="flex-1 min-w-0">
+                        {procEditingId === item.id ? (
+                          <textarea
+                            value={procEditValue}
+                            onChange={(e) => setProcEditValue(e.target.value)}
+                            rows={2}
+                            className="w-full rounded-lg border border-slate-600 bg-slate-900 px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500 resize-y"
+                          />
+                        ) : (
+                          <p className="text-xs text-slate-200 leading-snug whitespace-pre-wrap">
+                            {item.text}
+                          </p>
+                        )}
+                        <p className="text-[10px] text-slate-500 mt-1">Order: {index + 1}</p>
+                      </div>
+                      <div className="flex flex-col gap-1 shrink-0">
+                        {procEditingId === item.id ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => saveEditProcedure(item.id)}
+                              className="p-1 rounded bg-emerald-600/80 hover:bg-emerald-600 text-white"
+                              title="Save"
+                            >
+                              <Save className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEditProcedure}
+                              className="p-1 rounded bg-slate-700 hover:bg-slate-600 text-white"
+                              title="Cancel"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => startEditProcedure(item.id, item.text)}
+                            className="p-1 rounded bg-slate-700 hover:bg-slate-600 text-white"
+                            title="Edit"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={index === 0}
+                          onClick={() => moveProcedure(index, -1)}
+                          className="p-1 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-white"
+                          title="Move up"
+                        >
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={index === companyProcedures.length - 1}
+                          onClick={() => moveProcedure(index, 1)}
+                          className="p-1 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-white"
+                          title="Move down"
+                        >
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteProcedure(item.id)}
+                          className="p-1 rounded bg-rose-600/80 hover:bg-rose-600 text-white"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ===== Contact helpline number (10 digits only) ===== */}
+            <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4 space-y-3">
+              <h3 className="text-xs font-bold uppercase text-slate-400 tracking-widest">Contact Helpline number</h3>
+              <p className="text-[10px] text-slate-500">
+                Add helpline numbers. Only numeric digits are allowed (exactly 10 digits).
+              </p>
+
+              <div className="flex gap-2">
+                <input
+                  value={helpInput}
+                  onChange={(e) => setHelpInput(onlyDigits(e.target.value))}
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]{10}"
+                  maxLength={10}
+                  placeholder="10-digit helpline, e.g. 9876543210"
+                  className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white outline-none focus:border-blue-500 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={addHelpline}
+                  className="inline-flex items-center gap-1 px-3 rounded-lg text-xs font-bold bg-[#0078d4] hover:bg-blue-600 text-white"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {(activeClaimCompany?.helplineNumbers || []).length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/40 p-6 text-center text-xs text-slate-500">
+                  No helpline numbers yet. Type a 10-digit number and click +.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {(activeClaimCompany?.helplineNumbers || []).map((item, index) => (
+                    <div
+                      key={item.id}
+                      className="rounded-xl border border-slate-700 bg-slate-800/60 p-3 flex gap-2 items-start"
+                    >
+                      <div className="flex-1 min-w-0">
+                        {helpEditingId === item.id ? (
+                          <input
+                            value={helpEditValue}
+                            onChange={(e) => setHelpEditValue(onlyDigits(e.target.value))}
+                            type="tel"
+                            inputMode="numeric"
+                            pattern="[0-9]{10}"
+                            maxLength={10}
+                            className="w-full rounded-lg border border-slate-600 bg-slate-900 px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500 font-mono"
+                          />
+                        ) : (
+                          <p className="text-xs text-slate-200 font-mono leading-snug">
+                            {item.number}
+                          </p>
+                        )}
+                        <p className="text-[10px] text-slate-500 mt-1">Order: {index + 1}</p>
+                      </div>
+                      <div className="flex flex-col gap-1 shrink-0">
+                        {helpEditingId === item.id ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => saveEditHelpline(item.id)}
+                              className="p-1 rounded bg-emerald-600/80 hover:bg-emerald-600 text-white"
+                              title="Save"
+                            >
+                              <Save className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEditHelpline}
+                              className="p-1 rounded bg-slate-700 hover:bg-slate-600 text-white"
+                              title="Cancel"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => startEditHelpline(item.id, item.number)}
+                            className="p-1 rounded bg-slate-700 hover:bg-slate-600 text-white"
+                            title="Edit"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={index === 0}
+                          onClick={() => moveHelpline(index, -1)}
+                          className="p-1 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-white"
+                          title="Move up"
+                        >
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={index === (activeClaimCompany?.helplineNumbers || []).length - 1}
+                          onClick={() => moveHelpline(index, 1)}
+                          className="p-1 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-white"
+                          title="Move down"
+                        >
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteHelpline(item.id)}
+                          className="p-1 rounded bg-rose-600/80 hover:bg-rose-600 text-white"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/40 p-6 text-center text-xs text-slate-500">
+            No company selected. Add a company to get started.
+          </div>
+        )}
+      </div>
+    )}
 
       </div>
 
