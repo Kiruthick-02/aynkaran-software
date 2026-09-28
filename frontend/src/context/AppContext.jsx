@@ -366,13 +366,17 @@ export function AppProvider({ children }) {
 
   const updateCandidate = async (id, updatedFields) => {
     const username = adminUser || 'admin';
+    const { skipAppointmentNotifications, ...candidateFields } = updatedFields;
     setCandidates((prev) => {
-      const updated = prev.map((c) => (c.id === id ? { ...c, ...updatedFields } : c));
+      const updated = prev.map((c) => (c.id === id ? { ...c, ...candidateFields } : c));
       localStorage.setItem(`ayn_candidates_${username}`, JSON.stringify(updated));
       return updated;
     });
     try {
-      await apiService.updateCandidate(id, updatedFields);
+      await apiService.updateCandidate(id, {
+        ...candidateFields,
+        ...(skipAppointmentNotifications ? { skipAppointmentNotifications: true } : {})
+      });
       setIsOnline(true);
     } catch (err) {
       console.error('[API Update Candidate Error]', err);

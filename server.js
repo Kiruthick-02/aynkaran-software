@@ -587,7 +587,9 @@ Aynkaran Business CRM Autopilot`;
     const { id } = req.params;
     let oldCandidate = null;
     const updateData = { ...req.body };
+    const skipAppointmentNotifications = updateData.skipAppointmentNotifications === true;
     delete updateData._id;
+    delete updateData.skipAppointmentNotifications;
 
     if (mongoDbConnection) {
       try {
@@ -604,7 +606,7 @@ Aynkaran Business CRM Autopilot`;
     const codeGeneratedJustNow = updateData.exam?.agentCodeGenerated && (!oldCandidate || !oldCandidate.exam?.agentCodeGenerated);
 
     // If schedule changed, trigger notification
-    if (scheduleChanged) {
+    if (scheduleChanged && !skipAppointmentNotifications) {
       const mobile = updateData.mobile;
       const email = updateData.email;
       if (mobile || email) {

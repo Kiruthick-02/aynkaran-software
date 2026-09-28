@@ -943,7 +943,10 @@ export default function Recruitment({ candidates = [], addCandidate, updateCandi
                                 }
                               ]
                             };
-                            await updateCandidate(selectedCandidate.id, updated);
+                            await updateCandidate(selectedCandidate.id, {
+                              ...updated,
+                              skipAppointmentNotifications: true
+                            });
                             
                             // 2. Automatically create and complete reminder message
                             const reminderId = `rem-meet-${Date.now().toString().slice(-5)}`;

@@ -60,8 +60,10 @@ export class RecruitmentController {
     try {
       const { id } = req.params;
       const data = { ...req.body };
+      const skipAppointmentNotifications = data.skipAppointmentNotifications === true;
       delete data._id; // _id must be immutable
       delete data.id;
+      delete data.skipAppointmentNotifications;
 
       if (data.stageNumber) {
         data.stageNumber = Number(data.stageNumber);
@@ -81,7 +83,7 @@ export class RecruitmentController {
       const codeGeneratedJustNow = data.exam?.agentCodeGenerated && (!oldCandidate || !oldCandidate.exam?.agentCodeGenerated);
 
       // If schedule changed, trigger notification
-      if (scheduleChanged) {
+      if (scheduleChanged && !skipAppointmentNotifications) {
         const mobile = data.mobile;
         const email = data.email;
         if (mobile || email) {

@@ -49,16 +49,6 @@ export async function sendEmailReceipt(toAddress, subject, bodyText, htmlAttachm
 
   try {
     console.log(`[Email Dispatcher] Connecting via SMTP over TLS to ${smtpHost}:${smtpPort}...`);
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: isSecure,
-      auth: {
-        user: smtpUser,
-        pass: smtpPass
-      }
-    });
-
     const mailOptions = {
       from: `"${senderName}" <${senderEmail}>`,
       to: toAddress,
@@ -76,7 +66,37 @@ export async function sendEmailReceipt(toAddress, subject, bodyText, htmlAttachm
       attachments: attachments || []
     };
 
-    const deliveryReport = await transporter.sendMail(mailOptions);
+    let deliveryReport;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: isSecure,
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+        socketTimeout: 30000,
+        auth: {
+          user: smtpUser,
+          pass: smtpPass
+        }
+      });
+
+      try {
+        deliveryReport = await transporter.sendMail(mailOptions);
+        break;
+      } catch (sendError) {
+        const isConnectionTimeout = sendError.code === 'ETIMEDOUT' && sendError.command === 'CONN';
+        if (attempt === 1 && isConnectionTimeout) {
+          console.warn('[Email Dispatcher] SMTP connection timed out; retrying once.');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
+        }
+        throw sendError;
+      } finally {
+        transporter.close();
+      }
+    }
+
     console.log(`[Email Dispatcher] Email delivered successfully. MessageId: ${deliveryReport.messageId}`);
     return { status: 'delivered', success: true, messageId: deliveryReport.messageId };
   } catch (err) {

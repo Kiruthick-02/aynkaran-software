@@ -728,6 +728,7 @@ export default function AdvisorMilestoneTimeline({
       return;
     }
     setIsDispatchingMeeting(true);
+    setMeetingDispatchResult(null);
     try {
       const description = `Meeting scheduled for ${meetingDate} at ${meetingTime}. Venue: ${meetingVenue}.`;
       const reminder = await apiService.createReminder({
@@ -746,7 +747,8 @@ export default function AdvisorMilestoneTimeline({
       await apiService.updateCandidate(candidate.id, {
         appointmentDate: meetingDate,
         appointmentTime: meetingTime,
-        appointmentVenue: meetingVenue
+        appointmentVenue: meetingVenue,
+        skipAppointmentNotifications: true
       });
       const deliveryStatus = reminder.deliveryStatus || {
         whatsapp: candidate.mobile ? 'SENT' : 'NO MOBILE',
