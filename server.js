@@ -1018,6 +1018,8 @@ Aynkaran Business CRM Autopilot`;
       id: req.body.id || `rem-${Date.now().toString().slice(-5)}`,
       createdAt: req.body.createdAt || new Date().toISOString(),
     };
+    newReminder.deliveryStatus = { ...(newReminder.deliveryStatus || {}) };
+    newReminder.notificationResults = { ...(newReminder.notificationResults || {}) };
 
     // Auto Dispatch Automated SMS, WhatsApp, and Email instantly on backend
     if (newReminder.customerMobile || newReminder.customerEmail) {
@@ -1034,9 +1036,13 @@ Aynkaran Business CRM Autopilot`;
         sendSMSNotification(`whatsapp:${mobile}`, text).catch(e => console.error('[Backend WhatsApp error]', e));
       }
 
-      if (email && email !== 'no-email@aynakaran.com' && email !== 'no-email@aynakaran.com') {
-        // 3. Corporate Email via Secure TLS SMTP or Sandbox Interceptor Routing
-        sendEmailReceipt(email, title, text).catch(e => console.error('[Backend Email error]', e));
+      if (email && email !== 'no-email@aynakaran.com') {
+        const emailResult = await sendEmailReceipt(email, title, text)
+          .catch(error => ({ success: false, error: error.message }));
+        newReminder.deliveryStatus.email = emailResult.success
+          ? (emailResult.simulated ? 'SIMULATED' : 'SENT')
+          : 'FAILED';
+        newReminder.notificationResults.email = emailResult;
       }
     }
 

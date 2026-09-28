@@ -748,8 +748,16 @@ export default function AdvisorMilestoneTimeline({
         appointmentTime: meetingTime,
         appointmentVenue: meetingVenue
       });
-      setMeetingDispatchResult(reminder.deliveryStatus || { whatsapp: candidate.mobile ? 'SENT' : 'NO MOBILE', sms: candidate.mobile ? 'SENT' : 'NO MOBILE', email: candidate.email ? 'SENT' : 'NO EMAIL' });
-      onShowNotification?.('Meeting reminder created and notification delivery was requested.');
+      const deliveryStatus = reminder.deliveryStatus || {
+        whatsapp: candidate.mobile ? 'SENT' : 'NO MOBILE',
+        sms: candidate.mobile ? 'SENT' : 'NO MOBILE',
+        email: candidate.email ? 'SENT' : 'NO EMAIL'
+      };
+      const emailError = reminder.notificationResults?.email?.error || '';
+      setMeetingDispatchResult({ ...deliveryStatus, emailError });
+      onShowNotification?.(deliveryStatus.email === 'FAILED'
+        ? `Meeting reminder created, but email failed: ${emailError || 'SMTP delivery failed.'}`
+        : 'Meeting reminder created and notification delivery was requested.');
     } catch (err) {
       setMeetingDispatchResult({ whatsapp: 'FAILED', sms: 'FAILED', email: 'FAILED' });
       onShowNotification?.(`Unable to dispatch meeting alerts: ${err.message}`);
@@ -950,7 +958,7 @@ export default function AdvisorMilestoneTimeline({
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" onClick={handleAssignMeetingAppointment} disabled={isDispatchingMeeting} className="px-4 py-2.5 bg-[#0078d4] hover:bg-blue-600 disabled:opacity-50 text-white rounded-xl text-xs font-black">{isDispatchingMeeting ? 'Dispatching Alerts...' : 'Assign Date & Dispatch Alerts'}</button>
-            {meetingDispatchResult && <span className="text-[11px] text-emerald-300">WhatsApp: {meetingDispatchResult.whatsapp} · SMS: {meetingDispatchResult.sms} · Email: {meetingDispatchResult.email}</span>}
+            {meetingDispatchResult && <span className={`text-[11px] ${meetingDispatchResult.email === 'FAILED' ? 'text-rose-300' : 'text-emerald-300'}`}>WhatsApp: {meetingDispatchResult.whatsapp} · SMS: {meetingDispatchResult.sms} · Email: {meetingDispatchResult.email}{meetingDispatchResult.emailError ? ` (${meetingDispatchResult.emailError})` : ''}</span>}
           </div>
         </section>
       )}
