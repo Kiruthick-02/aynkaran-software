@@ -3,13 +3,12 @@ FROM node:20
 WORKDIR /app
 
 COPY package*.json ./
+COPY frontend/package*.json ./frontend/
+COPY backend/package*.json ./backend/
 
 RUN npm install
 
 COPY . .
-
-RUN cd backend && npm install
-RUN cd frontend && npm install
 
 RUN cd frontend && npm run build
 
