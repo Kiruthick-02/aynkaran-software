@@ -93,7 +93,7 @@ export default function AdvisorManagement({
   const [candAddress, setCandAddress] = useState('');
 
   // Bulk Message State
-  const [bulkChannel, setBulkChannel] = useState('WHATSAPP');
+  const [bulkChannel, setBulkChannel] = useState('ACTION_BUTTON');
   const [bulkMessage, setBulkMessage] = useState('Dear Advisor, please ensure your pending policy files and renewal reminders are reviewed.');
 
   // Load KPIs, hierarchy, and advisors
@@ -206,6 +206,15 @@ export default function AdvisorManagement({
     if (validationError) {
       if (onShowNotification) onShowNotification(validationError);
       return;
+    }
+    if (candPhotoFile) {
+      const imageError = ['image/png', 'image/jpeg', 'image/jpg'].includes(candPhotoFile.type) || /\.(png|jpe?g)$/i.test(candPhotoFile.name || '')
+        ? null
+        : 'Profile photo only supports PNG and JPG/JPEG files.';
+      if (imageError) {
+        onShowNotification?.(imageError);
+        return;
+      }
     }
 
     const candId = `cand-${Date.now().toString().slice(-6)}`;
@@ -940,8 +949,7 @@ export default function AdvisorManagement({
                     onChange={e => setBulkChannel(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white text-xs focus:outline-none"
                   >
-                    <option value="WHATSAPP">Custom WhatsApp Bulk Sender API</option>
-                    <option value="SMS">Digital SMS Carrier Gateway</option>
+                    <option value="WHATSAPP">Meta WhatsApp API</option>
                     <option value="EMAIL">SMTP Corporate Email Relay</option>
                   </select>
                 </div>
@@ -1215,11 +1223,17 @@ export default function AdvisorManagement({
                     <Camera className="w-3.5 h-3.5" />
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/png,image/jpeg,image/jpg"
                       className="hidden"
                       onChange={e => {
                         const file = e.target.files?.[0];
                         if (file) {
+                          const allowed = ['image/png', 'image/jpeg', 'image/jpg'].includes(file.type) || /\.(png|jpe?g)$/i.test(file.name || '');
+                          if (!allowed) {
+                            onShowNotification?.('Profile photo only supports PNG and JPG/JPEG files.');
+                            e.target.value = '';
+                            return;
+                          }
                           setCandPhotoFile(file);
                           setCandPhotoPreview(URL.createObjectURL(file));
                         }

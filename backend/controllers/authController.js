@@ -185,7 +185,7 @@ export class AuthController {
       console.log(`
 ============================ OTP OUTBOX SIMULATOR ============================
 [Service Alert] Trigger OTP for deletion of ${targetType}
-SuperAdmin Email : kiruthickrn@gmail.com
+SuperAdmin Email : info.aynkaranconsultants@gmail.com
 Staff Member     : ${username}
 Request Target   : ID ${targetId} (${targetName || 'Unnamed'})
 OTP CODE         : ${otpCode}
@@ -217,15 +217,15 @@ Please convey this verification code to the staff member so they can safely auth
 Best regards,
 Aynkaran Business CRM Autopilot`;
 
-        await sendEmailReceipt('kiruthickrn@gmail.com', emailSubject, emailBody);
-        console.log(`[Email Dispatcher] Dispatched deletion OTP email to kiruthickrn@gmail.com`);
+        await sendEmailReceipt('info.aynkaranconsultants@gmail.com', emailSubject, emailBody);
+        console.log(`[Email Dispatcher] Dispatched deletion OTP email to info.aynkaranconsultants@gmail.com`);
       } catch (emailErr) {
         console.error('[Email Dispatcher] Failed to dispatch deletion OTP:', emailErr);
       }
 
       res.json({
         success: true,
-        message: `An authorization OTP has been issued and dispatched to Superadmin's registered email (kiruthickrn@gmail.com).`
+        message: `An authorization OTP has been issued and dispatched to Superadmin's registered email (info.aynkaranconsultants@gmail.com).`
       });
     } catch (e) {
       res.status(500).json({ error: e.message });

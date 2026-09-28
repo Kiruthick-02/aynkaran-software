@@ -81,7 +81,7 @@ export async function sendEmailReceipt(toAddress, subject, bodyText, htmlAttachm
     return { status: 'delivered', success: true, messageId: deliveryReport.messageId };
   } catch (err) {
     if (err.message && (err.message.includes('testing purposes') || err.message.includes('only send emails to') || err.message.includes('421'))) {
-      console.log(`[Email Dispatcher] [Sandbox Detection] Intercepted SMTP restriction. Safely redirecting email originally for <${toAddress}> to sandbox authorized address: kiruthickrn@gmail.com`);
+      console.log(`[Email Dispatcher] [Sandbox Detection] Intercepted SMTP restriction. Safely redirecting email originally for <${toAddress}> to sandbox authorized address: info.aynkaranconsultants@gmail.com`);
       
       try {
         const transporter = nodemailer.createTransport({
@@ -96,7 +96,7 @@ export async function sendEmailReceipt(toAddress, subject, bodyText, htmlAttachm
         
         const sandboxMailOptions = {
           from: `"${senderName}" <${senderEmail}>`,
-          to: 'kiruthickrn@gmail.com',
+          to: 'info.aynkaranconsultants@gmail.com',
           subject: `[Sandbox Redirect from ${toAddress}] ${finalSubject}`,
           text: `[ORIGINAL DESTINATION: ${toAddress}]\n\n${finalBodyText}`,
           html: `

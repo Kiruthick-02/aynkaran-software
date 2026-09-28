@@ -1051,9 +1051,24 @@ export default function AdvisorMilestoneTimeline({
                       <span>{isUploaded ? 'Replace File' : 'Upload File'}</span>
                       <input
                         type="file"
-                        onChange={(e) => handleFilePicked(e, kyc.key)}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const isAllowed = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'].includes(file.type) || /\.(png|jpe?g|pdf)$/i.test(file.name || '');
+                          if (!isAllowed) {
+                            onShowNotification?.('Only PNG, JPG/JPEG, and PDF files are supported.');
+                            e.target.value = '';
+                            return;
+                          }
+                          if (file.size > 1024 * 1024) {
+                            onShowNotification?.('Each document must be under 1 MB.');
+                            e.target.value = '';
+                            return;
+                          }
+                          handleFilePicked(e, kyc.key);
+                        }}
                         className="hidden"
-                        accept="image/*,application/pdf"
+                        accept="image/png,image/jpeg,image/jpg,application/pdf"
                       />
                     </label>
 

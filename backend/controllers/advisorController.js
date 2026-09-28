@@ -1354,7 +1354,7 @@ export class AdvisorController {
       console.log(`
 ============================ OWNER OTP DISPATCH ============================
 [Service Alert] Trigger OTP for ${actionType}
-Owner Email      : kiruthickrn@gmail.com
+Owner Email      : info.aynkaranconsultants@gmail.com
 Requested By     : ${username}
 Target Details   : ${targetDetails}
 OTP CODE         : ${otpCode}
@@ -1383,11 +1383,11 @@ This OTP is valid for 10 minutes and can only be used once.
 Best regards,
 Aynkaran Business CRM Security Desk`;
 
-      await sendEmailReceipt('kiruthickrn@gmail.com', emailSubject, emailBody).catch(e => console.error('[OTP Email Dispatch Error]', e));
+      await sendEmailReceipt('info.aynkaranconsultants@gmail.com', emailSubject, emailBody).catch(e => console.error('[OTP Email Dispatch Error]', e));
 
       res.json({
         success: true,
-        message: 'Security authorization OTP has been generated and sent to the Business Owner (kiruthickrn@gmail.com).'
+        message: 'Security authorization OTP has been generated and sent to the Business Owner (info.aynkaranconsultants@gmail.com).'
       });
     } catch (e) {
       res.status(500).json({ error: e.message });

@@ -3,7 +3,13 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 
+const apiTarget = (process.env.VITE_API_URL || 'https://aynkaran-backend.onrender.com').replace(/\/$/, '');
+const removeBrowserOrigin = (proxy) => {
+  proxy.on('proxyReq', (proxyRequest) => proxyRequest.removeHeader('origin'));
+};
+
 export default defineConfig({
+  base: './',
   plugins: [
     react(),
     tailwindcss(),
@@ -24,18 +30,26 @@ export default defineConfig({
     watch: process.env.DISABLE_HMR === 'true' ? null : {},
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:7860',
+        target: apiTarget,
         changeOrigin: true,
         secure: false,
         ws: false,
+        configure: removeBrowserOrigin,
       },
       '/uploads': {
-        target: 'http://127.0.0.1:7860',
+        target: apiTarget,
         changeOrigin: true,
         secure: false,
         ws: false,
+        configure: removeBrowserOrigin,
       },
     },
+  },
+
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+    chunkSizeWarningLimit: 1400,
   },
 
   preview: {

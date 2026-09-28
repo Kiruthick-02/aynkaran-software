@@ -1,11 +1,142 @@
 // frontend/src/modules/policy-sales/CompaniesPolicies.jsx
-import React, { useState , useEffect } from 'react';
+import React, { useState , useEffect, useRef } from 'react';
 import { Plus, X, Building2, ShieldCheck, User, MapPin, Sparkles, Check, HelpCircle, Calendar, Upload, Edit, Trash2 } from 'lucide-react';
 import { companyApi } from '../../services/companyApi'; 
 import { apiService } from '../../services/api';
 import API_URL, { resolveApiUrl } from '../../config/api';
 
 import { createPortal } from 'react-dom';
+
+const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg'];
+const ACCEPTED_PDF_TYPES = ['application/pdf'];
+
+const isCompanyPauseActive = (company) => {
+  if (!company || company.status !== 'Temporarily Stopped') return false;
+  const stopEnd = company.stopEndDate ? new Date(company.stopEndDate) : null;
+  if (!stopEnd || Number.isNaN(stopEnd.getTime())) return true;
+  const now = new Date();
+  return stopEnd > now;
+};
+
+const validateImageFile = (file, label = 'Image', maxSizeBytes = 2 * 1024 * 1024) => {
+  if (!file) return null;
+  const safeName = file.name || '';
+  const isAllowedType = ACCEPTED_IMAGE_TYPES.includes(file.type) || /\.(png|jpe?g)$/i.test(safeName);
+  if (!isAllowedType) return `${label} only supports PNG and JPG/JPEG files.`;
+  if (file.size > maxSizeBytes) return `${label} must be under ${Math.round(maxSizeBytes / 1024 / 1024)} MB.`;
+  return null;
+};
+
+const validateDocumentFile = (file, label = 'Document', maxSizeBytes = 1024 * 1024) => {
+  if (!file) return null;
+  const safeName = file.name || '';
+  const isAllowedType =
+    ACCEPTED_IMAGE_TYPES.includes(file.type) ||
+    ACCEPTED_PDF_TYPES.includes(file.type) ||
+    /\.(png|jpe?g|pdf)$/i.test(safeName);
+  if (!isAllowedType) return `${label} only supports PNG, JPG/JPEG, or PDF files.`;
+  if (file.size > maxSizeBytes) return `${label} must be under 1 MB.`;
+  return null;
+};
+
+const formatDateDisplay = (value) => {
+  if (!value) return '';
+  const raw = String(value).trim();
+  if (!raw) return '';
+
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+  }
+
+  const digits = raw.replace(/\D/g, '').slice(0, 8);
+  if (!digits) return '';
+
+  const day = digits.slice(0, 2);
+  const month = digits.slice(2, 4);
+  const year = digits.slice(4, 8);
+
+  if (year) return `${day}${month ? `/${month}` : ''}${year ? `/${year}` : ''}`;
+  if (month) return `${day}/${month}`;
+  return day;
+};
+
+const toIsoDate = (value) => {
+  if (!value) return '';
+  const digits = String(value).replace(/\D/g, '').slice(0, 8);
+  if (digits.length !== 8) return '';
+
+  const day = Number(digits.slice(0, 2));
+  const month = Number(digits.slice(2, 4));
+  const year = Number(digits.slice(4, 8));
+
+  if (!year || month < 1 || month > 12 || day < 1 || day > 31) {
+    return '';
+  }
+
+  const isoDate = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(isoDate.getTime())) return '';
+
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+};
+
+function DateField({ label, value, onChange, required = false }) {
+  const nativeDateRef = useRef(null);
+
+  const handleTextChange = (event) => {
+    const digits = event.target.value.replace(/\D/g, '').slice(0, 8);
+    const formatted = digits.length > 4 ? `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}` : digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2, 4)}` : digits;
+    onChange(formatted);
+  };
+
+  const handleCalendarClick = () => {
+    if (nativeDateRef.current && typeof nativeDateRef.current.showPicker === 'function') {
+      nativeDateRef.current.showPicker();
+      return;
+    }
+    nativeDateRef.current?.focus();
+  };
+
+  return (
+    <div className="space-y-1">
+      <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+        {label}{required ? ' *' : ''}
+      </label>
+      <div className="relative">
+        <input
+          type="text"
+          value={value || ''}
+          onChange={handleTextChange}
+          onBlur={(event) => {
+            const masked = formatDateDisplay(event.target.value);
+            onChange(masked);
+          }}
+          placeholder="DD/MM/YYYY"
+          inputMode="numeric"
+          maxLength={10}
+          pattern="\\d{2}/\\d{2}/\\d{4}"
+          className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 pr-9 text-white outline-none focus:border-blue-500 text-xs font-mono"
+        />
+        <button
+          type="button"
+          onClick={handleCalendarClick}
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:text-white hover:bg-slate-800"
+          aria-label={`Choose ${label}`}
+        >
+          <Calendar className="w-4 h-4" />
+        </button>
+        <input
+          ref={nativeDateRef}
+          type="date"
+          value={toIsoDate(value || '')}
+          onChange={(event) => onChange(formatDateDisplay(event.target.value))}
+          className="sr-only absolute opacity-0 pointer-events-none"
+          aria-hidden="true"
+        />
+      </div>
+    </div>
+  );
+}
 
 function DocumentPreviewModal({ open, onClose, title, href, fileName }) {
   if (!open || !href) return null;
@@ -82,6 +213,11 @@ function DocUploadZone({
     const f = e.target.files?.[0];
     e.target.value = '';
     if (!f) return;
+    const validationError = validateDocumentFile(f, label || 'Document');
+    if (validationError) {
+      window.alert(validationError);
+      return;
+    }
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewFile(f);
     setPreviewUrl(URL.createObjectURL(f));
@@ -479,6 +615,7 @@ const [editPolicyBrochureCleared, setEditPolicyBrochureCleared] = useState(false
   const [custFatherName, setCustFatherName] = useState('');
   const [custMotherName, setCustMotherName] = useState('');
   const [custBloodGroup, setCustBloodGroup] = useState('');
+  const [custIssueDate, setCustIssueDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [nomineeName, setNomineeName] = useState('');
   const [nomineeDob, setNomineeDob] = useState('2015-01-01');
   const [nomineeRelationship, setNomineeRelationship] = useState('');
@@ -687,8 +824,13 @@ useEffect(() => {
     return;
   }
 
-  if (!newCompanyLogo) {
-    onShowNotification('Company logo is required');
+const logoError = validateImageFile(newCompanyLogo, 'Company logo');
+    if (!newCompanyLogo) {
+      onShowNotification('Company logo is required');
+      return;
+    }
+    if (logoError) {
+      onShowNotification(logoError);
     return;
   }
 
@@ -728,8 +870,8 @@ useEffect(() => {
     formData.append('descriptionPoints', JSON.stringify(descPoints));
 
     if (newCompanyStatus === 'Temporarily Stopped') {
-      formData.append('stopStartDate', newCompanyStopStart);
-      formData.append('stopEndDate', newCompanyStopEnd);
+      formData.append('stopStartDate', toIsoDate(newCompanyStopStart));
+      formData.append('stopEndDate', toIsoDate(newCompanyStopEnd));
       formData.append('stopReason', newCompanyStopReason.trim());
     }
 
@@ -779,8 +921,8 @@ useEffect(() => {
   setEditCompanyIrda(company.irdaRegistration || company.registrationCode || '');
   setEditCompanyAddress(company.address || '');
   setEditCompanyStatus(company.status || 'Active');
-  setEditCompanyStopStart(company.stopStartDate || '');
-  setEditCompanyStopEnd(company.stopEndDate || '');
+  setEditCompanyStopStart(formatDateDisplay(company.stopStartDate || ''));
+  setEditCompanyStopEnd(formatDateDisplay(company.stopEndDate || ''));
   setEditCompanyStopReason(company.stopReason || '');
   setEditCompanyInsuranceTypes(
     company.insuranceTypes?.length
@@ -845,6 +987,13 @@ useEffect(() => {
     onShowNotification('Company logo is required');
     return;
   }
+  if (editCompanyLogoFile) {
+    const logoError = validateImageFile(editCompanyLogoFile, 'Company logo');
+    if (logoError) {
+      onShowNotification(logoError);
+      return;
+    }
+  }
 
   const descPoints = (editCompanyDescriptionPoints || [])
     .filter((p) => String(p.text || '').trim())
@@ -882,8 +1031,8 @@ useEffect(() => {
     formData.append('descriptionPoints', JSON.stringify(descPoints));
 
     if (editCompanyStatus === 'Temporarily Stopped') {
-      formData.append('stopStartDate', editCompanyStopStart);
-      formData.append('stopEndDate', editCompanyStopEnd);
+      formData.append('stopStartDate', toIsoDate(editCompanyStopStart));
+      formData.append('stopEndDate', toIsoDate(editCompanyStopEnd));
       formData.append('stopReason', editCompanyStopReason.trim());
     } else {
       formData.append('stopStartDate', '');
@@ -971,9 +1120,9 @@ useEffect(() => {
         stopStatus === 'Active' ? 'show' : stopWebsiteVisibility || 'show',
       consultationEnabled: stopStatus === 'Active',
       stopStartDate:
-        stopStatus === 'Temporarily Stopped' ? stopStartDateVal : null,
+        stopStatus === 'Temporarily Stopped' ? toIsoDate(stopStartDateVal) : null,
       stopEndDate:
-        stopStatus === 'Temporarily Stopped' ? stopEndDateVal : null,
+        stopStatus === 'Temporarily Stopped' ? toIsoDate(stopEndDateVal) : null,
       stopReason:
         stopStatus === 'Temporarily Stopped' ? stopReasonVal.trim() : null,
     };
@@ -1453,6 +1602,13 @@ const handleDeletePolicy = async (policyId, policyName) => {
     uploadCustomerDoc(incomeProofFile, 'incomeProof'),
   ]);
 
+  const currentIssueDate = custIssueDate || new Date().toISOString().split('T')[0];
+  const renewalDateFromIssue = (() => {
+    const next = new Date(currentIssueDate);
+    next.setFullYear(next.getFullYear() + 1);
+    return next.toISOString().split('T')[0];
+  })();
+
   const customerPayload = {
     id: customerId,
     name: custName.trim(),
@@ -1468,6 +1624,8 @@ const handleDeletePolicy = async (policyId, policyName) => {
         : custAssignedAgent,
     address: custAddress.trim(),
     dateOfBirth: custDob,
+    issueDate: currentIssueDate,
+    renewalDate: renewalDateFromIssue,
     gender: custGender,
     city: 'Chennai',
     pinCode: '600001',
@@ -1490,7 +1648,6 @@ const handleDeletePolicy = async (policyId, policyName) => {
     policyType: selectedPolicy.name,
     premium: premNum,
     rate: selectedPolicy.rate,
-    renewalDate: '',
     createdAt: new Date().toISOString(),
   };
 
@@ -1551,6 +1708,7 @@ const handleDeletePolicy = async (policyId, policyName) => {
   setCustFatherName('');
   setCustMotherName('');
   setCustBloodGroup('');
+  setCustIssueDate(new Date().toISOString().split('T')[0]);
   setNomineeName('');
   setNomineeDob('2015-01-01');
   setNomineeRelationship('');
@@ -1618,6 +1776,7 @@ const handleDeletePolicy = async (policyId, policyName) => {
   setCustFatherName(cust.fatherName || '');
   setCustMotherName(cust.motherName || '');
   setCustBloodGroup(cust.bloodGroup || '');
+  setCustIssueDate(cust.issueDate || new Date().toISOString().split('T')[0]);
   setAnnualIncome(String(cust.annualIncome || ''));
 
   const nom = cust.nominee || {};
@@ -1867,8 +2026,8 @@ const handleDeletePolicy = async (policyId, policyName) => {
         onClick={() => {
           setStopCompanyId(company.id);
           setStopStatus(company.status);
-          setStopStartDateVal(company.stopStartDate || '');
-          setStopEndDateVal(company.stopEndDate || '');
+          setStopStartDateVal(formatDateDisplay(company.stopStartDate || ''));
+          setStopEndDateVal(formatDateDisplay(company.stopEndDate || ''));
           setStopReasonVal(company.stopReason || '');
           setStopWebsiteVisibility(company.websiteVisibility || 'show');
           setShowStopModal(true);
@@ -2364,6 +2523,17 @@ const handleDeletePolicy = async (policyId, policyName) => {
                 ))}
               </select>
             </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase text-slate-400 font-bold">
+                Issue Date
+              </label>
+              <input
+                type="date"
+                value={custIssueDate}
+                onChange={(e) => setCustIssueDate(e.target.value || new Date().toISOString().split('T')[0])}
+                className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -2759,7 +2929,7 @@ const handleDeletePolicy = async (policyId, policyName) => {
         </p>
       </div>
 
-      <form onSubmit={handleSaveCompany} className="space-y-4 text-xs font-semibold text-slate-300">
+      <form onSubmit={handleSaveCompany} noValidate className="space-y-4 text-xs font-semibold text-slate-300">
         {/* Logo + Background */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="space-y-1">
@@ -2769,10 +2939,16 @@ const handleDeletePolicy = async (policyId, policyName) => {
             <input
               required
               type="file"
-              accept="image/*"
+              accept="image/png,image/jpeg,image/jpg"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) {
+                  const validationError = validateImageFile(file, 'Company logo');
+                  if (validationError) {
+                    onShowNotification?.(validationError);
+                    e.target.value = '';
+                    return;
+                  }
                   setNewCompanyLogo(file);
                   setNewCompanyLogoPreview(URL.createObjectURL(file));
                 }
@@ -2793,10 +2969,16 @@ const handleDeletePolicy = async (policyId, policyName) => {
             </label>
             <input
               type="file"
-              accept="image/*"
+              accept="image/png,image/jpeg,image/jpg"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) {
+                  const validationError = validateImageFile(file, 'Company background');
+                  if (validationError) {
+                    onShowNotification?.(validationError);
+                    e.target.value = '';
+                    return;
+                  }
                   setNewCompanyBg(file);
                   setNewCompanyBgPreview(URL.createObjectURL(file));
                 }
@@ -2933,6 +3115,9 @@ const handleDeletePolicy = async (policyId, policyName) => {
                 onChange={() => {
                   setNewCompanyStatus('Active');
                   setNewWebsiteVisibility('show');
+                  setNewCompanyStopStart('');
+                  setNewCompanyStopEnd('');
+                  setNewCompanyStopReason('');
                 }}
                 className="accent-[#0078d4]"
               />
@@ -2949,7 +3134,39 @@ const handleDeletePolicy = async (policyId, policyName) => {
               Paused
             </label>
           </div>
-          {/* keep your existing paused dates / visibility block if status is Paused */}
+
+          {newCompanyStatus === 'Temporarily Stopped' && (
+            <div className="space-y-3 pt-3 border-t border-slate-700">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <DateField
+                  label="Pause Start Date"
+                  value={newCompanyStopStart}
+                  onChange={setNewCompanyStopStart}
+                  required
+                />
+                <DateField
+                  label="Pause End Date"
+                  value={newCompanyStopEnd}
+                  onChange={setNewCompanyStopEnd}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                  Reason for pausing *
+                </label>
+                <textarea
+                  required={newCompanyStatus === 'Temporarily Stopped'}
+                  rows={2}
+                  value={newCompanyStopReason}
+                  onChange={(e) => setNewCompanyStopReason(e.target.value)}
+                  placeholder="Enter reason for temporary pause..."
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-white outline-none text-xs"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-between items-center pt-2">
@@ -3095,7 +3312,7 @@ const handleDeletePolicy = async (policyId, policyName) => {
         </p>
       </div>
 
-      <form onSubmit={handleSaveStopControl} className="space-y-4 text-xs font-semibold text-slate-300">
+      <form onSubmit={handleSaveStopControl} noValidate className="space-y-4 text-xs font-semibold text-slate-300">
         <div className="bg-slate-900 p-4 rounded-lg border border-slate-800 space-y-4">
           <div className="flex gap-4">
             <label className="flex items-center gap-1.5 text-white font-bold cursor-pointer">
@@ -3106,6 +3323,9 @@ const handleDeletePolicy = async (policyId, policyName) => {
                 onChange={() => {
                   setStopStatus('Active');
                   setStopWebsiteVisibility('show');
+                  setStopStartDateVal('');
+                  setStopEndDateVal('');
+                  setStopReasonVal('');
                 }}
                 className="accent-[#0078d4]"
               />
@@ -3155,45 +3375,19 @@ const handleDeletePolicy = async (policyId, policyName) => {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-  <div className="space-y-1">
-    <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-      Pause Start Date *
-    </label>
-    <input
-      required
-      type="date"
-      min="1900-01-01"
-      max="2099-12-31"
-      value={stopStartDateVal || ''}
-      onChange={(e) => setStopStartDateVal(e.target.value)}
-      onClick={(e) => {
-        try {
-          e.currentTarget.showPicker?.();
-        } catch (_) {}
-      }}
-      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-white outline-none focus:border-blue-500 text-xs font-mono cursor-pointer"
-    />
-  </div>
-  <div className="space-y-1">
-    <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-      Pause End Date *
-    </label>
-    <input
-      required
-      type="date"
-      min="1900-01-01"
-      max="2099-12-31"
-      value={stopEndDateVal || ''}
-      onChange={(e) => setStopEndDateVal(e.target.value)}
-      onClick={(e) => {
-        try {
-          e.currentTarget.showPicker?.();
-        } catch (_) {}
-      }}
-      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-white outline-none focus:border-blue-500 text-xs font-mono cursor-pointer"
-    />
-  </div>
-</div>
+                <DateField
+                  label="Pause Start Date"
+                  value={stopStartDateVal}
+                  onChange={setStopStartDateVal}
+                  required
+                />
+                <DateField
+                  label="Pause End Date"
+                  value={stopEndDateVal}
+                  onChange={setStopEndDateVal}
+                  required
+                />
+              </div>
 
               <div className="space-y-1">
                 <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold">
@@ -3253,7 +3447,7 @@ const handleDeletePolicy = async (policyId, policyName) => {
         </p>
       </div>
 
-      <form onSubmit={handleUpdateCompany} className="space-y-4 text-xs font-semibold text-slate-300">
+      <form onSubmit={handleUpdateCompany} noValidate className="space-y-4 text-xs font-semibold text-slate-300">
         {/* Logo + Background */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="space-y-1">
@@ -3273,10 +3467,16 @@ const handleDeletePolicy = async (policyId, policyName) => {
               )}
               <input
                 type="file"
-                accept="image/*"
+                accept="image/png,image/jpeg,image/jpg"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
+                    const validationError = validateImageFile(file, 'Company logo');
+                    if (validationError) {
+                      onShowNotification?.(validationError);
+                      e.target.value = '';
+                      return;
+                    }
                     setEditCompanyLogoFile(file);
                     setEditCompanyLogoPreview(URL.createObjectURL(file));
                   }
@@ -3301,10 +3501,16 @@ const handleDeletePolicy = async (policyId, policyName) => {
               )}
               <input
                 type="file"
-                accept="image/*"
+                accept="image/png,image/jpeg,image/jpg"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
+                    const validationError = validateImageFile(file, 'Background image');
+                    if (validationError) {
+                      onShowNotification?.(validationError);
+                      e.target.value = '';
+                      return;
+                    }
                     setEditCompanyBgFile(file);
                     setEditCompanyBgPreview(URL.createObjectURL(file));
                   }
@@ -3434,6 +3640,9 @@ const handleDeletePolicy = async (policyId, policyName) => {
                 onChange={() => {
                   setEditCompanyStatus('Active');
                   setEditWebsiteVisibility('show');
+                  setEditCompanyStopStart('');
+                  setEditCompanyStopEnd('');
+                  setEditCompanyStopReason('');
                 }}
                 className="accent-[#0078d4]"
               />
@@ -3450,7 +3659,39 @@ const handleDeletePolicy = async (policyId, policyName) => {
               Paused
             </label>
           </div>
-          {/* keep existing paused visibility + dates block */}
+
+          {editCompanyStatus === 'Temporarily Stopped' && (
+            <div className="space-y-3 pt-3 border-t border-slate-700">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <DateField
+                  label="Pause Start Date"
+                  value={editCompanyStopStart}
+                  onChange={setEditCompanyStopStart}
+                  required
+                />
+                <DateField
+                  label="Pause End Date"
+                  value={editCompanyStopEnd}
+                  onChange={setEditCompanyStopEnd}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                  Reason for pausing *
+                </label>
+                <textarea
+                  required={editCompanyStatus === 'Temporarily Stopped'}
+                  rows={2}
+                  value={editCompanyStopReason}
+                  onChange={(e) => setEditCompanyStopReason(e.target.value)}
+                  placeholder="Enter reason for temporary pause..."
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-white outline-none text-xs"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-between items-center pt-2">
@@ -3461,6 +3702,9 @@ const handleDeletePolicy = async (policyId, policyName) => {
               setEditCompanyContact('');
               setEditCompanyAddress('');
               setEditCompanyStatus('Active');
+              setEditCompanyStopStart('');
+              setEditCompanyStopEnd('');
+              setEditCompanyStopReason('');
               setEditCompanyInsuranceTypes(['Life Insurance']);
               setEditWebsiteVisibility('show');
               setEditCompanyLogoFile(null);

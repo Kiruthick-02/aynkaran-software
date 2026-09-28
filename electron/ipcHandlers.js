@@ -1,32 +1,28 @@
+import { dialog, ipcMain } from 'electron';
+import fs from 'fs';
+import path from 'path';
 
-const { shell, dialog } = require('electron');
-const path = require('path');
-const fs = require('fs');
+export function initializeIpcHandlers(ipcMainInstance) {
+  ipcMainInstance.handle('get:system-info', async () => ({
+    platform: process.platform,
+    arch: process.arch,
+    version: '1.4.0',
+    nodeVersion: process.versions.node,
+    offlineSecure: true,
+  }));
 
-function initializeIpcHandlers(ipcMain) {
-  // System general information
-  ipcMain.handle('get:system-info', async () => {
-    return {
-      platform: process.platform,
-      arch: process.arch,
-      version: '1.4.0',
-      nodeVersion: process.versions.node,
-      offlineSecure: true,
-    };
-  });
-
-  // Local caching configurations
-  ipcMain.handle('get:local-cache', async (event, key) => {
+  ipcMainInstance.handle('get:local-cache', async (_event, key) => {
     const dataPath = path.join(process.cwd(), 'offline_store.json');
     if (!fs.existsSync(dataPath)) {
       return null;
     }
+
     const content = fs.readFileSync(dataPath, 'utf-8');
     const db = JSON.parse(content);
     return db[key] || null;
   });
 
-  ipcMain.handle('set:local-cache', async (event, { key, value }) => {
+  ipcMainInstance.handle('set:local-cache', async (_event, { key, value }) => {
     const dataPath = path.join(process.cwd(), 'offline_store.json');
     let db = {};
     if (fs.existsSync(dataPath)) {
@@ -37,8 +33,7 @@ function initializeIpcHandlers(ipcMain) {
     return true;
   });
 
-  // PDF Print dialog logic
-  ipcMain.on('print:pdf', (event, htmlContent) => {
+  ipcMainInstance.on('print:pdf', (event, htmlContent) => {
     const options = {
       title: 'Export Certified Dossier Document',
       defaultPath: path.join(process.cwd(), 'aynkaran_export.pdf'),
@@ -53,8 +48,7 @@ function initializeIpcHandlers(ipcMain) {
     });
   });
 
-  // System Database Backup
-  ipcMain.on('db:backup', (event) => {
+  ipcMainInstance.on('db:backup', (event) => {
     const dbFile = path.join(process.cwd(), 'database.json');
     if (!fs.existsSync(dbFile)) {
       return event.reply('sys:alert', { status: 'error', message: 'Root CRM database.json not found.' });
@@ -75,4 +69,4 @@ function initializeIpcHandlers(ipcMain) {
   });
 }
 
-module.exports = { initializeIpcHandlers };
+export default { initializeIpcHandlers };

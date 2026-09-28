@@ -1,7 +1,5 @@
-
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Secure context bridge for communicating between React frontend and safe native APIs
 contextBridge.exposeInMainWorld('aynkaranDesktop', {
   send: (channel, data) => {
     const validSendChannels = ['app:status', 'print:pdf', 'whatsapp:payload', 'db:backup'];
@@ -12,7 +10,7 @@ contextBridge.exposeInMainWorld('aynkaranDesktop', {
   receive: (channel, func) => {
     const validReceiveChannels = ['update:available', 'update:downloaded', 'db:backup:success', 'sys:alert'];
     if (validReceiveChannels.includes(channel)) {
-      ipcRenderer.on(channel, (event, ...args) => func(...args));
+      ipcRenderer.on(channel, (_event, ...args) => func(...args));
     }
   },
   invoke: (channel, data) => {
@@ -20,5 +18,6 @@ contextBridge.exposeInMainWorld('aynkaranDesktop', {
     if (validInvokeChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, data);
     }
+    return null;
   },
 });

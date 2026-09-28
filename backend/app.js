@@ -24,34 +24,49 @@ export function createExpressApp(db) {
   const app = express();
 
   const allowedOrigins = [
-    'http://localhost:5173',   // Desktop frontend
+    'http://localhost:4173',   // Electron + Vite desktop frontend
+    'http://127.0.0.1:4173',
+    'http://localhost:5173',   // Vite dev frontend
     'http://127.0.0.1:5173',
     'http://localhost:3000',   // Website frontend
     'http://127.0.0.1:3000',
+    'http://localhost:4174',
+    'http://127.0.0.1:4174',
+    'https://aynkaran-backend.onrender.com',
+    'https://www.aynkaranconsultants.com',
+    'https://aynkaranconsultants.com',
   ];
   const configuredFrontendOrigins = String(process.env.FRONTEND_URL || '')
     .split(',')
     .map(origin => origin.trim().replace(/\/$/, ''))
     .filter(Boolean);
+  const localhostOriginPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(?::\d+)?$/i;
+  const publicHostPattern = /(?:\.vercel\.app|\.hf\.space|huggingface\.co|up\.railway\.app|onrender\.com)$/i;
 
   app.use(cors({
     origin: function (origin, callback) {
       if (!origin) return callback(null, true);
-      if (
-        allowedOrigins.includes(origin) ||
-        origin.includes('up.railway.app') ||
-        origin.includes('.hf.space') ||
-        origin.includes('huggingface.co') ||
-        origin.includes('.vercel.app') ||
-        configuredFrontendOrigins.includes(origin)
-      ) {
+
+      const normalizedOrigin = origin.replace(/\/$/, '');
+      const isAllowed =
+        allowedOrigins.includes(normalizedOrigin) ||
+        localhostOriginPattern.test(normalizedOrigin) ||
+        publicHostPattern.test(normalizedOrigin) ||
+        configuredFrontendOrigins.includes(normalizedOrigin) ||
+        normalizedOrigin.startsWith('http://localhost:') ||
+        normalizedOrigin.startsWith('http://127.0.0.1:') ||
+        normalizedOrigin.startsWith('https://localhost:') ||
+        normalizedOrigin.startsWith('https://127.0.0.1:');
+
+      if (isAllowed) {
         return callback(null, true);
       }
+
       return callback(new Error(`CORS blocked for origin: ${origin}`), false);
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept', 'X-Requested-With'],
   }));
 
   app.options('*', cors());

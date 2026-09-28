@@ -2,10 +2,20 @@
 // Central API configuration for production and development
 const configuredApiUrl = String(import.meta.env.VITE_API_URL || '').trim();
 const deployedBackendUrl = 'https://aynkaran-backend.onrender.com';
-let baseUrl = configuredApiUrl || (import.meta.env.PROD ? deployedBackendUrl : 'http://localhost:7860');
+const isElectron = typeof navigator !== 'undefined' && /Electron/i.test(navigator.userAgent);
+const isLocalViteDev = import.meta.env.DEV && typeof window !== 'undefined' &&
+  ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+let baseUrl = isLocalViteDev
+  ? ''
+  : configuredApiUrl || (import.meta.env.PROD ? deployedBackendUrl : 'http://localhost:7860');
+
+if (isElectron && !isLocalViteDev) {
+  baseUrl = deployedBackendUrl;
+}
 
 // Fallback to relative paths on active container instances (Google development/preview containers, localhost)
-if (!configuredApiUrl && typeof window !== 'undefined') {
+if (!isElectron && !configuredApiUrl && typeof window !== 'undefined') {
   const host = window.location.hostname;
   if (
     !host ||

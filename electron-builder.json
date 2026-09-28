@@ -1,26 +1,30 @@
 {
-  "appId": "com.aynkaran.desk.crm",
-  "productName": "Aynkaran Consultants Desk Management",
+  "appId": "com.aynkaran.insurance",
+  "productName": "Aynkaran Insurance Management System",
   "directories": {
     "output": "release"
   },
   "files": [
     "electron/**/*",
-    "backend/**/*",
-    "database.json",
-    "package.json"
+    "frontend/dist/**/*",
+    "package.json",
+    "package-lock.json",
+    "node_modules/**/*"
   ],
   "asar": true,
   "win": {
     "target": "nsis",
-    "icon": "frontend/public/icon.png"
+    "icon": "build/icon.ico",
+    "sign": false,
+    "signAndEditExecutable": false
   },
   "nsis": {
     "oneClick": false,
     "allowToChangeInstallationDirectory": true,
-    "createDesktopShortcut": "always",
+    "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "Aynkaran Desk CRM"
+    "shortcutName": "Aynkaran Insurance Management System",
+    "artifactName": "Aynkaran Insurance Management System Setup ${version}.exe"
   },
   "mac": {
     "category": "public.app-category.business",

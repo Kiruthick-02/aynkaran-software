@@ -5,19 +5,30 @@ export function catalogRoutes(db) {
   const router = express.Router();
   const collection = db.collection('insurance_companies');
 
+  const isPauseExpired = (company) => {
+    if (!company || company.status !== 'Temporarily Stopped') return false;
+    const stopEndDate = company.stopEndDate ? new Date(company.stopEndDate) : null;
+    if (!stopEndDate || Number.isNaN(stopEndDate.getTime())) return false;
+    return stopEndDate <= new Date();
+  };
+
   router.get('/public/catalog', async (req, res) => {
     try {
-      const companies = await collection
-        .find({
-          $or: [
-            { status: 'Active' },
-            { status: 'Temporarily Stopped', websiteVisibility: 'show' },
-          ],
-        })
-        .toArray();
+      const allCompanies = await collection.find({}).toArray();
+      const companies = allCompanies.filter((c) => {
+        const pauseExpired = isPauseExpired(c);
+        if (c.status === 'Active' || pauseExpired) {
+          return (c.websiteVisibility || 'show') !== 'hide';
+        }
+        if (c.status === 'Temporarily Stopped') {
+          return false;
+        }
+        return false;
+      });
 
       const websiteCompanies = companies.map((c) => {
-        const isFullyActive = c.status === 'Active';
+        const effectiveStatus = isPauseExpired(c) ? 'Active' : c.status;
+        const isFullyActive = effectiveStatus === 'Active';
         return {
           id: c._id.toString(),
           name: c.name,
@@ -41,13 +52,14 @@ export function catalogRoutes(db) {
           isActive: isFullyActive,
           consultationEnabled: isFullyActive,
           websiteVisibility: c.websiteVisibility || 'show',
-          status: c.status,
+          status: effectiveStatus,
         };
       });
 
       const websiteProducts = [];
       companies.forEach((c) => {
-        const isFullyActive = c.status === 'Active';
+        const effectiveStatus = isPauseExpired(c) ? 'Active' : c.status;
+        const isFullyActive = effectiveStatus === 'Active';
 
         (c.policies || [])
           .filter((p) => p.websiteVisibility !== 'hide')

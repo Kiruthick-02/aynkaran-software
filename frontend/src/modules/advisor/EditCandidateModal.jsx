@@ -80,8 +80,10 @@ export default function EditCandidateModal({
   const handlePhotoSelected = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setErrorMsg('Please select a valid image file (JPG, PNG, WEBP).');
+    const supported = ['image/png', 'image/jpeg', 'image/jpg'].includes(file.type) || /\.(png|jpe?g)$/i.test(file.name || '');
+    if (!supported) {
+      setErrorMsg('Please select a valid image file (PNG or JPG/JPEG only).');
+      e.target.value = '';
       return;
     }
     setSelectedPhotoFile(file);
@@ -204,7 +206,7 @@ export default function EditCandidateModal({
                   <Camera className="w-4 h-4" />
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/png,image/jpeg,image/jpg"
                     className="hidden"
                     onChange={handlePhotoSelected}
                   />
@@ -222,7 +224,7 @@ export default function EditCandidateModal({
                     <span>Upload New Photo</span>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/png,image/jpeg,image/jpg"
                       className="hidden"
                       onChange={handlePhotoSelected}
                     />

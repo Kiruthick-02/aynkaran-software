@@ -24,7 +24,7 @@ export default function OtpVerificationModal({
     try {
       await advisorApi.requestOtp('admin', actionType, targetDetails);
       if (onShowNotification) {
-        onShowNotification('Security authorization OTP dispatched to Owner email (kiruthickrn@gmail.com).');
+        onShowNotification('Security authorization OTP dispatched to Owner email (info.aynkaranconsultants@gmail.com).');
       }
       setResendCountdown(60);
     } catch (err) {
@@ -113,7 +113,7 @@ export default function OtpVerificationModal({
               <ShieldCheck className="w-4 h-4 text-emerald-400" /> Security Checkpoint
             </p>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              A 6-digit One-Time Password (OTP) has been dispatched to the Business Owner's registered email: <strong className="text-white font-mono">kiruthickrn@gmail.com</strong>.
+              A 6-digit One-Time Password (OTP) has been dispatched to the Business Owner's registered email: <strong className="text-white font-mono">info.aynkaranconsultants@gmail.com</strong>.
             </p>
           </div>
 

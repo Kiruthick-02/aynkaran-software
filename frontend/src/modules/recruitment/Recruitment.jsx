@@ -45,6 +45,15 @@ const getFileUrl = (url) => {
   return `${API_URL || ''}${url}`;
 };
 
+const validateProfileImageFile = (file, label = 'Profile image') => {
+  if (!file) return null;
+  const name = file.name || '';
+  const isAllowedType = ['image/png', 'image/jpeg', 'image/jpg'].includes(file.type) || /\.(png|jpe?g)$/i.test(name);
+  if (!isAllowedType) return `${label} only supports PNG and JPG/JPEG files.`;
+  if (file.size > 2 * 1024 * 1024) return `${label} must be under 2 MB.`;
+  return null;
+};
+
 export default function Recruitment({ candidates = [], addCandidate, updateCandidate, deleteCandidate }) {
   const { loadStateFromServer, customers, addReminder } = useApp();
   const [selectedCandidate, setSelectedCandidate] = useState(null);
@@ -158,14 +167,30 @@ export default function Recruitment({ candidates = [], addCandidate, updateCandi
 
   const handleAddCandidate = (e) => {
     e.preventDefault();
-    if (!newName || !newMobile) return;
+    const cleanName = newName.trim();
+    const cleanMobile = newMobile.replace(/\D/g, '').slice(0, 10);
+    if (!cleanName) {
+      alert('Candidate name is required.');
+      return;
+    }
+    if (!cleanMobile || cleanMobile.length !== 10) {
+      alert('Mobile number must be exactly 10 digits.');
+      return;
+    }
+    if (newProfilePicFile) {
+      const fileError = validateProfileImageFile(newProfilePicFile, 'Profile photo');
+      if (fileError) {
+        alert(fileError);
+        return;
+      }
+    }
 
     const todayStr = new Date().toISOString().split('T')[0];
     const candId = `cand-${Date.now().toString().substring(7)}`;
     const newCand = {
       id: candId,
       name: newName,
-      mobile: newMobile,
+      mobile: cleanMobile,
       email: newEmail || 'no-email@aynakaran.com',
       profilePicture: newProfilePic || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(newName)}`,
       appointmentDate: '', // Empty initially - only configured in the stage workflow
@@ -979,7 +1004,7 @@ export default function Recruitment({ candidates = [], addCandidate, updateCandi
                           <input
                             type="file"
                             id="candidate-file-uploader"
-                            accept="image/*,application/pdf"
+                            accept="image/png,image/jpeg,image/jpg,application/pdf"
                             className="hidden"
                             onChange={async (e) => {
                               if (e.target.files && e.target.files[0]) {
@@ -1138,12 +1163,18 @@ export default function Recruitment({ candidates = [], addCandidate, updateCandi
               <div className="flex flex-col items-center justify-center pb-2">
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/jpg"
                   className="hidden"
                   id="profile-pic-upload"
                   onChange={async (e) => {
                     if (e.target.files && e.target.files[0]) {
                       const file = e.target.files[0];
+                      const fileError = validateProfileImageFile(file, 'Profile photo');
+                      if (fileError) {
+                        alert(fileError);
+                        e.target.value = '';
+                        return;
+                      }
                       const compressed = await compressImageToBase64(file);
                       if (compressed) {
                         setNewProfilePic(compressed);
@@ -1240,7 +1271,16 @@ export default function Recruitment({ candidates = [], addCandidate, updateCandi
 
             <form onSubmit={async (e) => {
               e.preventDefault();
-              if (!editName || !editMobile) return;
+              const cleanName = editName.trim();
+              const cleanMobile = editMobile.replace(/\D/g, '').slice(0, 10);
+              if (!cleanName) {
+                alert('Candidate name is required.');
+                return;
+              }
+              if (!cleanMobile || cleanMobile.length !== 10) {
+                alert('Mobile number must be exactly 10 digits.');
+                return;
+              }
               
               let currentProfilePic = editProfilePic;
               
@@ -1257,10 +1297,10 @@ export default function Recruitment({ candidates = [], addCandidate, updateCandi
 
               const updated = {
                 ...editingCandidate,
-                name: editName,
-                mobile: editMobile,
+                name: cleanName,
+                mobile: cleanMobile,
                 email: editEmail || 'no-email@aynakaran.com',
-                profilePicture: currentProfilePic || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(editName)}`,
+                profilePicture: currentProfilePic || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}`,
               };
 
               await updateCandidate(editingCandidate.id, updated);
@@ -1272,12 +1312,18 @@ export default function Recruitment({ candidates = [], addCandidate, updateCandi
               <div className="flex flex-col items-center justify-center pb-2">
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/jpg"
                   className="hidden"
                   id="edit-profile-pic-upload"
                   onChange={async (e) => {
                     if (e.target.files && e.target.files[0]) {
                       const file = e.target.files[0];
+                      const fileError = validateProfileImageFile(file, 'Profile photo');
+                      if (fileError) {
+                        alert(fileError);
+                        e.target.value = '';
+                        return;
+                      }
                       const compressed = await compressImageToBase64(file);
                       if (compressed) {
                         setEditProfilePic(compressed);

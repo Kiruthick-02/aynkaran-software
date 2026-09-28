@@ -1,13 +1,22 @@
 {
   "name": "aynkaran-crm",
   "private": true,
+  "version": "1.0.0",
+  "description": "Aynkaran Insurance Business Management System",
+  "author": "Aynkaran Consultants",
   "type": "module",
+  "main": "electron/main.js",
   "scripts": {
     "install-frontend": "cd frontend && npm install",
     "install-backend": "cd backend && npm install",
     "build-frontend": "cd frontend && npm run build",
-    "build": "npm run install-frontend && npm run install-backend && npm run build-frontend",
-    "start": "node server.js"
+    "build": "npm --prefix frontend run build",
+    "dev": "npm --prefix frontend run dev -- --host 0.0.0.0",
+    "start": "node server.js",
+    "postinstall": "npm --prefix frontend install --no-audit --no-fund && npm --prefix backend install --no-audit --no-fund",
+    "electron": "npx cross-env VITE_API_URL=https://aynkaran-backend.onrender.com VITE_PORT=4173 npx electron .",
+    "electron:dev": "npx cross-env VITE_API_URL=https://aynkaran-backend.onrender.com VITE_PORT=4173 concurrently \"npm --prefix frontend run dev -- --host 0.0.0.0 --port 4173 --strictPort false\" \"npx wait-on http://localhost:4173 && npx cross-env VITE_API_URL=https://aynkaran-backend.onrender.com VITE_PORT=4173 npx electron .\"",
+    "dist": "npm run build && npx cross-env VITE_API_URL=https://aynkaran-backend.onrender.com VITE_PORT=4173 npx electron-builder"
   },
   "dependencies": {
     "cors": "^2.8.6",
@@ -18,5 +27,13 @@
     "multer": "^2.2.0",
     "nodemailer": "^9.0.1",
     "vite": "^8.1.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0",
+    "electron": "^31.7.4",
+    "electron-builder": "^25.1.4",
+    "electron-updater": "^6.3.4",
+    "wait-on": "^9.1.0",
+    "cross-env": "^7.0.0"
   }
 }

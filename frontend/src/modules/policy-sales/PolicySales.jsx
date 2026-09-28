@@ -677,7 +677,7 @@ export default function PolicySales({ policies = [], addPolicy, updatePolicy, de
 
             <div className="text-xs text-slate-600 leading-relaxed space-y-3">
               <p>
-                Deleting records requires Superadmin authorization context. A one-time verification passcode (OTP) has been queued to Superadmin registered coordinate email: **kiruthickrn@gmail.com**.
+                Deleting records requires Superadmin authorization context. A one-time verification passcode (OTP) has been queued to Superadmin registered coordinate email: **info.aynkaranconsultants@gmail.com**.
               </p>
 
               {otpLoading && (

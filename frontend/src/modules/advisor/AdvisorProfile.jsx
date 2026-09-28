@@ -13,15 +13,16 @@ import { resolveApiUrl } from '../../config/api';
 import AdvisorMilestoneTimeline from './AdvisorMilestoneTimeline';
 import DocumentPreviewModal from './DocumentPreviewModal';
 import AdvisorStatusModal from './AdvisorStatusModal';
+import { companyApi } from '../../services/companyApi';
 
 const TABS = [
   { id: 'overview', label: '1. Overview' },
   { id: 'personal', label: '2. Personal Info' },
   { id: 'professional', label: '3. Professional Info' },
   { id: 'documents', label: '4. Documents' },
-  { id: 'customers', label: '6. Customers' },
-  { id: 'reminders', label: '7. Reminders' },
-  { id: 'history', label: '8. Activity History' }
+  { id: 'customers', label: '5. Customers' },
+  { id: 'reminders', label: '6. Reminders' },
+  { id: 'history', label: '7. Activity History' }
 ];
 
 const ADVISOR_DOCUMENT_TYPES = [
@@ -80,8 +81,20 @@ export default function AdvisorProfile({
   const [perfYear, setPerfYear] = useState(new Date().getFullYear());
   const [performanceData, setPerformanceData] = useState(null);
   const [availableCustomers, setAvailableCustomers] = useState([]);
-  const [customerLink, setCustomerLink] = useState({ customerId: '', name: '', mobile: '', policy: '', company: '' });
+  const [availableCompanies, setAvailableCompanies] = useState([]);
+  const [customerLink, setCustomerLink] = useState({
+    customerId: '',
+    name: '',
+    mobile: '',
+    companyId: '',
+    company: '',
+    policyId: '',
+    policy: ''
+  });
   const [isSavingCustomerLink, setIsSavingCustomerLink] = useState(false);
+
+  const selectedCompany = availableCompanies.find(company => String(company.id) === String(customerLink.companyId)) || null;
+  const companyPolicyOptions = selectedCompany?.policies && Array.isArray(selectedCompany.policies) ? selectedCompany.policies : [];
 
   const fetchAdvisorDetails = async () => {
     if (!advisorId) return;
@@ -119,6 +132,19 @@ export default function AdvisorProfile({
 
   useEffect(() => {
     apiService.getCustomers().then(rows => setAvailableCustomers(Array.isArray(rows) ? rows : [])).catch(() => setAvailableCustomers([]));
+    companyApi.getAll()
+      .then(rows => {
+        const normalizedCompanies = (Array.isArray(rows) ? rows : []).map(company => ({
+          ...company,
+          id: company.id || company._id || company._id?.toString?.() || `company-${company.name}`,
+          policies: Array.isArray(company.policies) ? company.policies.map(policy => ({
+            ...policy,
+            id: policy.id || policy._id || policy._id?.toString?.() || `${company.name}-${policy.name}`,
+          })) : []
+        }));
+        setAvailableCompanies(normalizedCompanies);
+      })
+      .catch(() => setAvailableCompanies([]));
   }, []);
 
   useEffect(() => {
@@ -127,9 +153,40 @@ export default function AdvisorProfile({
     }
   }, [activeTab, perfYear, advisorId]);
 
+  useEffect(() => {
+    if (!customerLink.companyId && !customerLink.company) {
+      return;
+    }
+
+    if (customerLink.companyId) {
+      const company = availableCompanies.find(item => String(item.id) === String(customerLink.companyId));
+      if (company && (!customerLink.company || String(customerLink.company) !== String(company.name))) {
+        setCustomerLink(previous => ({ ...previous, company: company.name || '' }));
+      }
+    }
+
+    if (customerLink.policyId) {
+      const selectedPolicy = companyPolicyOptions.find(item => String(item.id) === String(customerLink.policyId));
+      if (selectedPolicy && (!customerLink.policy || String(customerLink.policy) !== String(selectedPolicy.name || selectedPolicy.policyName || selectedPolicy.type))) {
+        setCustomerLink(previous => ({ ...previous, policy: selectedPolicy.name || selectedPolicy.policyName || selectedPolicy.type || '' }));
+      }
+    }
+  }, [customerLink.companyId, customerLink.company, customerLink.policyId, availableCompanies, companyPolicyOptions]);
+
   const handleFilePicked = (e, category) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const isAllowedType = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'].includes(file.type) || /\.(png|jpe?g|pdf)$/i.test(file.name || '');
+    if (!isAllowedType) {
+      onShowNotification?.('Only PNG, JPG/JPEG, and PDF files are supported.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 1024 * 1024) {
+      onShowNotification?.('Each document must be under 1 MB.');
+      e.target.value = '';
+      return;
+    }
     setSelectedUploadFile(file);
     setUploadCategory(category || 'Advisor Document');
     setShowDocPreviewModal(true);
@@ -206,10 +263,19 @@ export default function AdvisorProfile({
 
   const handleCustomerLinkSave = async (event) => {
     event.preventDefault();
-    if (!customerLink.name.trim() || !customerLink.mobile.trim() || !customerLink.policy.trim() || !customerLink.company.trim()) {
-      onShowNotification?.('Enter customer name, mobile number, policy, and company.');
+    if (!customerLink.name.trim() || !customerLink.mobile.trim()) {
+      onShowNotification?.('Enter customer name and mobile number.');
       return;
     }
+    if (!customerLink.companyId || !customerLink.company.trim()) {
+      onShowNotification?.('Select a company from the available company & policy listings.');
+      return;
+    }
+    if (!customerLink.policyId || !customerLink.policy.trim()) {
+      onShowNotification?.('Select a policy for the chosen company.');
+      return;
+    }
+
     setIsSavingCustomerLink(true);
     try {
       let customerId = customerLink.customerId;
@@ -236,7 +302,7 @@ export default function AdvisorProfile({
         currentStage: 'Policy Issued',
         issueDate: new Date().toISOString().split('T')[0]
       });
-      setCustomerLink({ customerId: '', name: '', mobile: '', policy: '', company: '' });
+      setCustomerLink({ customerId: '', name: '', mobile: '', companyId: '', company: '', policyId: '', policy: '' });
       await fetchAdvisorDetails();
       onShowNotification?.('Customer and policy linked to this advisor.');
     } catch (err) {
@@ -636,7 +702,7 @@ export default function AdvisorProfile({
                           </a>
                           <label className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer transition">
                             <Upload className="w-3 h-3" /> Replace
-                            <input type="file" accept="image/*,application/pdf" className="hidden" onChange={event => handleFilePicked(event, doc.category || type.name)} />
+                            <input type="file" accept="image/png,image/jpeg,image/jpg,application/pdf" className="hidden" onChange={event => handleFilePicked(event, doc.category || type.name)} />
                           </label>
                         </div>
 
@@ -697,9 +763,48 @@ export default function AdvisorProfile({
             <form onSubmit={handleCustomerLinkSave} className="p-4 bg-slate-900 border border-slate-800 rounded-2xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               <select value={customerLink.customerId} onChange={event => { const selected = availableCustomers.find(customer => String(customer.id) === event.target.value); setCustomerLink(previous => ({ ...previous, customerId: event.target.value, name: selected?.name || '', mobile: selected?.mobile || selected?.mobileNumber || '' })); }} className="bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white"><option value="">Create a new customer</option>{availableCustomers.map(customer => <option key={customer.id} value={customer.id}>{customer.name} — {customer.mobile || customer.mobileNumber || 'No mobile'}</option>)}</select>
               <input required value={customerLink.name} disabled={Boolean(customerLink.customerId)} onChange={event => setCustomerLink(previous => ({ ...previous, name: event.target.value }))} placeholder="Customer name" className="bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white disabled:opacity-60" />
-              <input required value={customerLink.mobile} disabled={Boolean(customerLink.customerId)} onChange={event => setCustomerLink(previous => ({ ...previous, mobile: event.target.value }))} placeholder="Mobile number" className="bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white disabled:opacity-60" />
-              <input required value={customerLink.policy} onChange={event => setCustomerLink(previous => ({ ...previous, policy: event.target.value }))} placeholder="Policy chosen" className="bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white" />
-              <input required value={customerLink.company} onChange={event => setCustomerLink(previous => ({ ...previous, company: event.target.value }))} placeholder="Company" className="bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white" />
+              <input
+                required
+                value={customerLink.mobile}
+                disabled={Boolean(customerLink.customerId)}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={10}
+                onChange={event => {
+                  const digitsOnly = event.target.value.replace(/\D/g, '').slice(0, 10);
+                  setCustomerLink(previous => ({ ...previous, mobile: digitsOnly }));
+                }}
+                placeholder="Mobile number"
+                className="bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white disabled:opacity-60"
+              />
+              <select value={customerLink.companyId} onChange={event => {
+                const selected = availableCompanies.find(company => String(company.id) === String(event.target.value));
+                setCustomerLink(previous => ({
+                  ...previous,
+                  companyId: event.target.value,
+                  company: selected?.name || '',
+                  policyId: '',
+                  policy: ''
+                }));
+              }} className="bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white">
+                <option value="">Select company</option>
+                {availableCompanies.map(company => (
+                  <option key={company.id || company.name} value={company.id || company.name}>{company.name}</option>
+                ))}
+              </select>
+              <select value={customerLink.policyId} onChange={event => {
+                const selectedPolicy = companyPolicyOptions.find(policy => String(policy.id) === String(event.target.value));
+                setCustomerLink(previous => ({
+                  ...previous,
+                  policyId: event.target.value,
+                  policy: selectedPolicy?.name || selectedPolicy?.policyName || selectedPolicy?.type || ''
+                }));
+              }} className="bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white" disabled={!customerLink.companyId || companyPolicyOptions.length === 0}>
+                <option value="">{customerLink.companyId ? 'Select policy' : 'Choose a company first'}</option>
+                {companyPolicyOptions.map(policy => (
+                  <option key={policy.id || `${customerLink.companyId}-${policy.name}`} value={policy.id || policy.name}>{policy.name || policy.policyName || policy.type || 'Unnamed policy'}</option>
+                ))}
+              </select>
               <button disabled={isSavingCustomerLink} className="bg-[#0078d4] hover:bg-blue-600 disabled:opacity-50 text-white rounded-xl p-2.5 font-bold">{isSavingCustomerLink ? 'Saving...' : 'Save customer'}</button>
             </form>
             <div className="overflow-x-auto rounded-2xl border border-slate-800">

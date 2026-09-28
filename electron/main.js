@@ -1,8 +1,11 @@
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { initializeIpcHandlers } from './ipcHandlers.js';
+import { autoUpdater } from './updater.js';
 
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
-const path = require('path');
-const { initializeIpcHandlers } = require('./ipcHandlers');
-const { autoUpdater } = require('./updater');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 let mainWindow = null;
 
@@ -14,30 +17,38 @@ function createMainWindow() {
     minHeight: 768,
     frame: true,
     titleBarStyle: 'default',
-    title: 'Aynkaran Consultants - Operations Management Desktop',
-    backgroundColor: '#0F172A', // Deep slate primary background
+    title: 'Aynkaran Insurance Management System',
+    backgroundColor: '#0F172A',
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
     },
   });
 
-  // Determine window load source (React build output vs local dev server)
+  global.mainWindow = mainWindow;
+
   const isDev = !app.isPackaged;
+  const devPort = process.env.VITE_PORT || '4173';
   if (isDev) {
-    mainWindow.loadURL('http://localhost:3000');
-    mainWindow.webContents.openDevTools();
+    mainWindow.loadURL(`http://localhost:${devPort}`);
   } else {
     mainWindow.loadFile(path.join(__dirname, '../frontend/dist/index.html'));
   }
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
   });
 
-  // Safe external URL routing
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+    global.mainWindow = null;
+  });
+
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
@@ -45,9 +56,11 @@ function createMainWindow() {
 }
 
 app.whenReady().then(() => {
-  // Setup secure handlers & update hooks
   initializeIpcHandlers(ipcMain);
-  autoUpdater.checkForUpdatesAndNotify();
+
+  if (app.isPackaged) {
+    autoUpdater.checkForUpdatesAndNotify();
+  }
 
   createMainWindow();
 
