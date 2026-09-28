@@ -66,6 +66,7 @@ export class ReminderController {
 
       data.channels = data.channels || {};
       data.deliveryStatus = data.deliveryStatus || {};
+      let queuedEmail = null;
 
       // Auto Dispatch Automated SMS, WhatsApp, and Email instantly on backend
       if (data.customerMobile || data.customerEmail) {
@@ -75,17 +76,22 @@ export class ReminderController {
         const desc = data.description || '';
         const text = `${title} - ${desc}`;
 
-        const [sms, whatsapp, emailResult] = await Promise.all([
+        const [sms, whatsapp] = await Promise.all([
           mobile ? sendSMSNotification(mobile, text) : Promise.resolve({ success: false, error: 'No mobile number' }),
-          mobile ? sendSMSNotification(`whatsapp:${mobile}`, text) : Promise.resolve({ success: false, error: 'No mobile number' }),
-          email && email !== 'no-email@aynakaran.com' ? sendEmailReceipt(email, title, text) : Promise.resolve({ success: false, error: 'No email address' })
+          mobile ? sendSMSNotification(`whatsapp:${mobile}`, text) : Promise.resolve({ success: false, error: 'No mobile number' })
         ]);
+        const hasEmail = email && email !== 'no-email@aynakaran.com';
+        queuedEmail = hasEmail ? { email, title, text } : null;
         data.deliveryStatus = {
           sms: sms.success ? (sms.simulated ? 'SIMULATED' : 'SENT') : 'FAILED',
           whatsapp: whatsapp.success ? (whatsapp.simulated ? 'SIMULATED' : 'SENT') : 'FAILED',
-          email: emailResult.success ? (emailResult.simulated ? 'SIMULATED' : 'SENT') : 'FAILED'
+          email: hasEmail ? 'QUEUED' : 'FAILED'
         };
-        data.notificationResults = { sms, whatsapp, email: emailResult };
+        data.notificationResults = {
+          sms,
+          whatsapp,
+          email: hasEmail ? { success: true, queued: true } : { success: false, error: 'No email address' }
+        };
       }
 
       await this.db.collection('reminders').insertOne(data);
@@ -93,6 +99,24 @@ export class ReminderController {
       const responseData = { ...data };
       delete responseData._id;
       res.status(201).json(responseData);
+
+      if (queuedEmail) {
+        setImmediate(async () => {
+          const emailResult = await sendEmailReceipt(queuedEmail.email, queuedEmail.title, queuedEmail.text)
+            .catch(error => ({ success: false, error: error.message }));
+          const emailStatus = emailResult.success
+            ? (emailResult.simulated ? 'SIMULATED' : 'SENT')
+            : 'FAILED';
+          try {
+            await this.db.collection('reminders').updateOne(
+              { id: data.id },
+              { $set: { 'deliveryStatus.email': emailStatus, 'notificationResults.email': emailResult } }
+            );
+          } catch (error) {
+            console.error('[Backend Email Status Update Error]', error);
+          }
+        });
+      }
     } catch (e) {
       res.status(400).json({ error: e.message });
     }

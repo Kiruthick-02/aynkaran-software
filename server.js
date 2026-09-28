@@ -1022,6 +1022,7 @@ Aynkaran Business CRM Autopilot`;
     };
     newReminder.deliveryStatus = { ...(newReminder.deliveryStatus || {}) };
     newReminder.notificationResults = { ...(newReminder.notificationResults || {}) };
+    let queuedEmail = null;
 
     // Auto Dispatch Automated SMS, WhatsApp, and Email instantly on backend
     if (newReminder.customerMobile || newReminder.customerEmail) {
@@ -1039,26 +1040,50 @@ Aynkaran Business CRM Autopilot`;
       }
 
       if (email && email !== 'no-email@aynakaran.com') {
-        const emailResult = await sendEmailReceipt(email, title, text)
-          .catch(error => ({ success: false, error: error.message }));
-        newReminder.deliveryStatus.email = emailResult.success
-          ? (emailResult.simulated ? 'SIMULATED' : 'SENT')
-          : 'FAILED';
-        newReminder.notificationResults.email = emailResult;
+        queuedEmail = { email, title, text };
+        newReminder.deliveryStatus.email = 'QUEUED';
+        newReminder.notificationResults.email = { success: true, queued: true };
       }
     }
 
     if (mongoDbConnection) {
       try {
         await mongoDbConnection.collection('reminders').insertOne({ ...newReminder });
-        res.status(201).json(newReminder);
       } catch (err) {
-        res.status(400).json({ error: err.message });
+        return res.status(400).json({ error: err.message });
       }
     } else {
       db.reminders.unshift(newReminder);
       saveDatabase(db);
-      res.status(201).json(newReminder);
+    }
+
+    res.status(201).json(newReminder);
+    if (queuedEmail) {
+      setImmediate(async () => {
+        const emailResult = await sendEmailReceipt(queuedEmail.email, queuedEmail.title, queuedEmail.text)
+          .catch(error => ({ success: false, error: error.message }));
+        const emailStatus = emailResult.success
+          ? (emailResult.simulated ? 'SIMULATED' : 'SENT')
+          : 'FAILED';
+
+        try {
+          if (mongoDbConnection) {
+            await mongoDbConnection.collection('reminders').updateOne(
+              { id: newReminder.id },
+              { $set: { 'deliveryStatus.email': emailStatus, 'notificationResults.email': emailResult } }
+            );
+          } else {
+            const savedReminder = db.reminders.find(reminder => reminder.id === newReminder.id);
+            if (savedReminder) {
+              savedReminder.deliveryStatus.email = emailStatus;
+              savedReminder.notificationResults.email = emailResult;
+              saveDatabase(db);
+            }
+          }
+        } catch (error) {
+          console.error('[Backend Email Status Update Error]', error);
+        }
+      });
     }
   });
 

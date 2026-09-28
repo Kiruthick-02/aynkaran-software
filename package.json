@@ -15,7 +15,7 @@
     "start": "node server.js",
     "postinstall": "npm --prefix frontend install --no-audit --no-fund && npm --prefix backend install --no-audit --no-fund",
     "electron": "npx cross-env VITE_API_URL=https://aynkaran-backend.onrender.com VITE_PORT=4173 npx electron .",
-    "electron:dev": "npx cross-env VITE_API_URL=https://aynkaran-backend.onrender.com VITE_PORT=4173 concurrently \"npm --prefix frontend run dev -- --host 0.0.0.0 --port 4173 --strictPort false\" \"npx wait-on http://localhost:4173 && npx cross-env VITE_API_URL=https://aynkaran-backend.onrender.com VITE_PORT=4173 npx electron .\"",
+    "electron:dev": "npx cross-env VITE_API_URL=http://localhost:7860 VITE_PORT=4173 concurrently -k \"npm --prefix backend run dev\" \"npm --prefix frontend run dev -- --host 0.0.0.0 --port 4173 --strictPort false\" \"npx wait-on http://localhost:4173 http://localhost:7860/api/health && npx cross-env VITE_API_URL=http://localhost:7860 VITE_PORT=4173 npx electron .\"",
     "dist": "npm run build && npx cross-env VITE_API_URL=https://aynkaran-backend.onrender.com VITE_PORT=4173 npx electron-builder"
   },
   "dependencies": {

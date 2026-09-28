@@ -757,9 +757,35 @@ export default function AdvisorMilestoneTimeline({
       };
       const emailError = reminder.notificationResults?.email?.error || '';
       setMeetingDispatchResult({ ...deliveryStatus, emailError });
+      if (deliveryStatus.email === 'QUEUED') {
+        void (async () => {
+          for (let attempt = 0; attempt < 10; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            try {
+              const reminders = await apiService.getReminders();
+              const latest = reminders.find(item => item.id === reminder.id);
+              const emailStatus = latest?.deliveryStatus?.email;
+              if (emailStatus && emailStatus !== 'QUEUED') {
+                const latestEmailError = latest.notificationResults?.email?.error || '';
+                setMeetingDispatchResult(current => current
+                  ? { ...current, email: emailStatus, emailError: latestEmailError }
+                  : current);
+                if (emailStatus === 'FAILED') {
+                  onShowNotification?.(`Meeting reminder email failed: ${latestEmailError || 'SMTP delivery failed.'}`);
+                }
+                return;
+              }
+            } catch (error) {
+              console.error('Unable to refresh meeting email status:', error);
+            }
+          }
+        })();
+      }
       onShowNotification?.(deliveryStatus.email === 'FAILED'
         ? `Meeting reminder created, but email failed: ${emailError || 'SMTP delivery failed.'}`
-        : 'Meeting reminder created and notification delivery was requested.');
+        : deliveryStatus.email === 'QUEUED'
+          ? 'Meeting reminder created; email delivery is queued.'
+          : 'Meeting reminder created and notification delivery was requested.');
     } catch (err) {
       setMeetingDispatchResult({ whatsapp: 'FAILED', sms: 'FAILED', email: 'FAILED' });
       onShowNotification?.(`Unable to dispatch meeting alerts: ${err.message}`);
@@ -960,7 +986,7 @@ export default function AdvisorMilestoneTimeline({
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" onClick={handleAssignMeetingAppointment} disabled={isDispatchingMeeting} className="px-4 py-2.5 bg-[#0078d4] hover:bg-blue-600 disabled:opacity-50 text-white rounded-xl text-xs font-black">{isDispatchingMeeting ? 'Dispatching Alerts...' : 'Assign Date & Dispatch Alerts'}</button>
-            {meetingDispatchResult && <span className={`text-[11px] ${meetingDispatchResult.email === 'FAILED' ? 'text-rose-300' : 'text-emerald-300'}`}>WhatsApp: {meetingDispatchResult.whatsapp} · SMS: {meetingDispatchResult.sms} · Email: {meetingDispatchResult.email}{meetingDispatchResult.emailError ? ` (${meetingDispatchResult.emailError})` : ''}</span>}
+            {meetingDispatchResult && <span className={`text-[11px] ${meetingDispatchResult.email === 'FAILED' ? 'text-rose-300' : meetingDispatchResult.email === 'QUEUED' ? 'text-sky-300' : 'text-emerald-300'}`}>WhatsApp: {meetingDispatchResult.whatsapp} · SMS: {meetingDispatchResult.sms} · Email: {meetingDispatchResult.email}{meetingDispatchResult.emailError ? ` (${meetingDispatchResult.emailError})` : ''}</span>}
           </div>
         </section>
       )}

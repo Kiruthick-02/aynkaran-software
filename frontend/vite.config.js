@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 
-const apiTarget = (process.env.VITE_API_URL || 'https://aynkaran-backend.onrender.com').replace(/\/$/, '');
+const apiTarget = (process.env.VITE_API_URL || 'http://localhost:7860').replace(/\/$/, '');
 const removeBrowserOrigin = (proxy) => {
   proxy.on('proxyReq', (proxyRequest) => proxyRequest.removeHeader('origin'));
 };
