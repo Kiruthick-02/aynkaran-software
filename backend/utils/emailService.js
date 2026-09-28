@@ -6,6 +6,8 @@
 import nodemailer from 'nodemailer';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 
 /**
  * Interpolate template variables into message string
@@ -24,16 +26,78 @@ function interpolate(templateStr, vars = {}) {
  * Production SMTP-based outbound email courier with TLS secure transmission
  */
 export async function sendEmailReceipt(toAddress, subject, bodyText, htmlAttachmentContent = null, variables = {}, attachments = []) {
+  const resendApiKey = process.env.RESEND_API_KEY?.trim();
   const smtpHost = process.env.SMTP_HOST?.trim();
   const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
   const smtpUser = process.env.SMTP_USER?.trim();
   const smtpPass = process.env.SMTP_PASSWORD?.trim() || process.env.SMTP_PASS?.trim();
-  const senderEmail = process.env.SMTP_FROM?.trim() || process.env.SENDER_EMAIL?.trim() || smtpUser;
+  const senderEmail = process.env.EMAIL_FROM?.trim() || process.env.SMTP_FROM?.trim() || process.env.SENDER_EMAIL?.trim() || smtpUser;
   const senderName = process.env.SMTP_FROM_NAME?.trim() || 'Aynkaran Consultants';
   const isSecure = process.env.SMTP_SECURE === 'true' || smtpPort === 465;
 
   const finalSubject = interpolate(subject, variables);
   const finalBodyText = interpolate(bodyText, variables);
+  const finalHtml = htmlAttachmentContent ? interpolate(htmlAttachmentContent, variables) : `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 25px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #fafbfd; color: #1e293b;">
+      <h2 style="color: #4f46e5; margin-top: 0;">${senderName}</h2>
+      <hr style="border: 0; height: 1px; background-color: #e2e8f0; margin: 15px 0;" />
+      <p style="font-size: 14px; line-height: 1.6; color: #334155;">${finalBodyText.replace(/\n/g, '<br>')}</p>
+      <hr style="border: 0; height: 1px; background-color: #e2e8f0; margin: 20px 0;" />
+      <span style="font-size: 11px; color: #64748b; display: block; text-align: center;">This is an automated notification alert from Aynkaran Business CRM. Please do not reply directly to this mailer.</span>
+    </div>
+  `;
+
+  if (resendApiKey) {
+    if (!senderEmail) {
+      return { status: 'failed', success: false, error: 'EMAIL_FROM must be set when using Resend.' };
+    }
+
+    try {
+      const resendAttachments = await Promise.all((attachments || []).map(async attachment => {
+        let content = attachment.content;
+        if (content === undefined && attachment.path) {
+          if (/^https?:\/\//i.test(attachment.path)) {
+            const response = await fetch(attachment.path);
+            if (!response.ok) throw new Error(`Unable to fetch email attachment (${response.status}).`);
+            content = Buffer.from(await response.arrayBuffer());
+          } else {
+            content = await readFile(attachment.path);
+          }
+        }
+        if (content === undefined) throw new Error('Email attachment is missing content or a readable path.');
+        return {
+          filename: attachment.filename || (attachment.path ? path.basename(attachment.path) : 'attachment'),
+          content: Buffer.isBuffer(content) ? content.toString('base64') : Buffer.from(content).toString('base64')
+        };
+      }));
+
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: `${senderName} <${senderEmail}>`,
+          to: [toAddress],
+          subject: finalSubject,
+          text: finalBodyText,
+          html: finalHtml,
+          ...(resendAttachments.length ? { attachments: resendAttachments } : {})
+        }),
+        signal: AbortSignal.timeout(15000)
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.message || result.name || `Resend API returned HTTP ${response.status}.`);
+      }
+      console.log(`[Email Dispatcher] Email accepted by Resend. MessageId: ${result.id}`);
+      return { status: 'delivered', success: true, messageId: result.id, gateway: 'Resend API' };
+    } catch (error) {
+      console.error('[Email Dispatcher] Resend API dispatch failed:', error.message);
+      return { status: 'failed', success: false, error: error.message, gateway: 'Resend API' };
+    }
+  }
 
   if (!smtpHost || !smtpUser || !smtpPass) {
     console.log('[Email Dispatcher] (Simulation Mode) SMTP configuration keys are unassigned.');
@@ -56,15 +120,7 @@ export async function sendEmailReceipt(toAddress, subject, bodyText, htmlAttachm
       to: toAddress,
       subject: finalSubject,
       text: finalBodyText,
-      html: htmlAttachmentContent ? interpolate(htmlAttachmentContent, variables) : `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 25px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #fafbfd; color: #1e293b;">
-          <h2 style="color: #4f46e5; margin-top: 0;">${senderName}</h2>
-          <hr style="border: 0; height: 1px; background-color: #e2e8f0; margin: 15px 0;" />
-          <p style="font-size: 14px; line-height: 1.6; color: #334155;">${finalBodyText.replace(/\n/g, '<br>')}</p>
-          <hr style="border: 0; height: 1px; background-color: #e2e8f0; margin: 20px 0;" />
-          <span style="font-size: 11px; color: #64748b; display: block; text-align: center;">This is an automated notification alert from Aynkaran Business CRM. Please do not reply directly to this mailer.</span>
-        </div>
-      `,
+      html: finalHtml,
       attachments: attachments || []
     };
 
