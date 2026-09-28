@@ -4,6 +4,8 @@
  */
 
 import nodemailer from 'nodemailer';
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 
 /**
  * Interpolate template variables into message string
@@ -68,13 +70,23 @@ export async function sendEmailReceipt(toAddress, subject, bodyText, htmlAttachm
 
     let deliveryReport;
     for (let attempt = 1; attempt <= 2; attempt++) {
+      let smtpAddress = smtpHost;
+      if (!isIP(smtpHost)) {
+        try {
+          smtpAddress = (await lookup(smtpHost, { family: 4 })).address;
+        } catch {
+          smtpAddress = smtpHost;
+        }
+      }
+
       const transporter = nodemailer.createTransport({
-        host: smtpHost,
+        host: smtpAddress,
         port: smtpPort,
         secure: isSecure,
         connectionTimeout: 15000,
         greetingTimeout: 15000,
         socketTimeout: 30000,
+        tls: isIP(smtpHost) ? undefined : { servername: smtpHost },
         auth: {
           user: smtpUser,
           pass: smtpPass
