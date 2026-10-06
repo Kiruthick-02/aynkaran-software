@@ -1,5 +1,6 @@
 import React from 'react';
 import { Check, Edit3, Lock, Upload } from 'lucide-react';
+import { getTraineeIdPrefix, USE_FORMATTED_TRAINEE_ID } from '../../config/traineeIdConfig.js';
 
 // Keep this outside the panel component.  A component declared inside the
 // render function is treated as a new React component after every keystroke,
@@ -51,6 +52,8 @@ export default function StageActivityPanel({
 	const isCandidateStage = Boolean(candidate) && !advisor;
 	const canEditCandidate = isCandidateStage && typeof onOpenEditModal === 'function';
 	const canConvert = currentStageNumber === 10 && candidate && typeof onOpenConversionModal === 'function';
+	const traineeIdPrefix = getTraineeIdPrefix();
+	const traineeIdSerial = String(formData.traineeId || '').replace(/^TR\d{2}/i, '');
 
 	return (
 		<section className="p-5 bg-slate-900/70 border border-slate-800 rounded-2xl space-y-4">
@@ -123,7 +126,30 @@ export default function StageActivityPanel({
 			</div>
 
 			{currentStageNumber === 1 && <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><StageField formData={formData} onChange={onChange} label="Meeting date" field="meetingDate" type="date" /><StageField formData={formData} onChange={onChange} label="Meeting time" field="meetingTime" type="time" /><StageField formData={formData} onChange={onChange} label="Meeting venue" field="meetingVenue" /><StageField formData={formData} onChange={onChange} label="Meeting outcome" field="meetingOutcome" options={['Completed', 'Not Attended', 'Rescheduled', 'Cancelled']} /></div>}
-			{currentStageNumber === 2 && <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><StageField formData={formData} onChange={onChange} label="Trainee ID" field="traineeId" required /><StageField formData={formData} onChange={onChange} label="Commitment status" field="commitmentStatus" options={['Pending', 'Signed', 'Declined']} /><StageField formData={formData} onChange={onChange} label="Declaration document reference" field="commitmentDocument" /></div>}
+			{currentStageNumber === 2 && <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+				{USE_FORMATTED_TRAINEE_ID ? (
+					<label className="block">
+						<span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Trainee ID</span>
+						<span className="mt-1 flex w-full overflow-hidden rounded-lg border border-slate-800 bg-slate-950 focus-within:border-blue-500">
+							<span className="flex items-center border-r border-slate-800 px-2 text-xs font-mono text-blue-400">{traineeIdPrefix}</span>
+							<input
+								type="text"
+								inputMode="numeric"
+								pattern="[0-9]*"
+								value={traineeIdSerial}
+								required
+								onChange={(event) => {
+									const serial = event.target.value.replace(new RegExp(`^${traineeIdPrefix}`, 'i'), '').replace(/\D/g, '');
+									onChange?.('traineeId', serial ? `${traineeIdPrefix}${serial}` : '');
+								}}
+								className="min-w-0 flex-1 bg-transparent p-2 text-xs text-white outline-none"
+							/>
+						</span>
+					</label>
+				) : <StageField formData={formData} onChange={onChange} label="Trainee ID" field="traineeId" required />}
+				<StageField formData={formData} onChange={onChange} label="Commitment status" field="commitmentStatus" options={['Pending', 'Signed', 'Declined']} />
+				<StageField formData={formData} onChange={onChange} label="Declaration document reference" field="commitmentDocument" />
+			</div>}
 			{currentStageNumber === 4 && <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><StageField formData={formData} onChange={onChange} label="Amount" field="amount" type="number" /><StageField formData={formData} onChange={onChange} label="Payment status" field="paymentStatus" options={['Pending', 'Paid']} /><StageField formData={formData} onChange={onChange} label="Payment date" field="paymentDate" type="date" /><StageField formData={formData} onChange={onChange} label="Payment method" field="paymentMethod" options={['Cash', 'Bank', 'UPI', 'Other']} /></div>}
 			{currentStageNumber === 7 && <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><StageField formData={formData} onChange={onChange} label="Amount" field="amount" type="number" /><StageField formData={formData} onChange={onChange} label="Payment status" field="paymentStatus" options={['Pending', 'Paid']} /><StageField formData={formData} onChange={onChange} label="Payment date" field="paymentDate" type="date" /><StageField formData={formData} onChange={onChange} label="Payment method" field="paymentMethod" options={['Cash', 'Bank', 'UPI', 'Other']} /></div>}
 			{currentStageNumber === 5 && <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><StageField formData={formData} onChange={onChange} label="PRL application status" field="prlApplicationStatus" options={['Pending', 'Applied', 'Completed']} /><StageField formData={formData} onChange={onChange} label="URN Number" field="urnNumber" /><StageField formData={formData} onChange={onChange} label="Application date" field="prlApplicationDate" type="date" /><StageField formData={formData} onChange={onChange} label="Application/reference number" field="prlReference" /></div>}
